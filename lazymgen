@@ -146,9 +146,21 @@ grammar MigrationSource {
     }
 }
 
+class Migration {
+    has Match:D $.source is required;
+    has Str:D $.up = '';
+    has Str:D $.down = '';
+}
+
 role TransformFormat {
     # Export matched statement to complete migration code
-    method export-migration(Match:D $s --> Str) {...}
+    method export-migration(Match:D $s --> Migration) {
+        Migration.new(
+            source => $s,
+            up     => self.statement($s),
+            down   => self.statement($s, :back),
+        );
+    }
 
     method create-table(Match:D $s --> Str) {...}
     method drop-table  (Match:D $s --> Str) {...}
@@ -268,8 +280,26 @@ role TransformFormat {
     }
 }
 
+class Yii2Migration is Migration {
+    has Str:D $.indent = '';
+
+    multi method gist(Yii2Migration: --> Str) {
+        [~] '=' x 20, "\{\n",
+            $!indent, 'HEAD', '-' x 10, "\n",
+            $!indent, "// generated with $PROJECT_NAME/$PROJECT_VER from statement:\n",
+            $!indent, "//\n",
+            $!indent, '// ', self.source.Str, "\n",
+            $!indent, 'UP', '-' x 12, "\n",
+            $!indent x 2, self.up, "\n",
+            $!indent, 'DOWN', '-' x 10, "\n",
+            $!indent x 2, self.down, "\n",
+            "}";
+    }
+}
+
 class Yii2Format does TransformFormat {
-    my constant INDENT           = ' ' x 4;
+    has Str:D $.indent = '';
+
     my constant UNSIGNED         = '->unsigned()';
     my constant MAX_INDEX_LENGTH = 64;
 
@@ -309,35 +339,31 @@ class Yii2Format does TransformFormat {
     my constant S_PK = 'pk';
     my constant S_IDX = 'idx';
 
-    method export-migration(Match:D $s --> Str) {
-        [~] '=' x 20, "\{\n",
-            INDENT, "// generated with $PROJECT_NAME/$PROJECT_VER from statement:\n",
-            INDENT, "//\n",
-            INDENT, '// ', $s.Str, "\n",
-            INDENT, 'UP', '-' x 12, "\n",
-            INDENT x 2, self.statement($s), "\n",
-            "\n",
-            INDENT, 'DOWN', '-' x 10, "\n",
-            INDENT x 2, self.statement($s, :back), "\n",
-            "}\n";
+    method export-migration(Match:D $s --> Migration) {
+        Yii2Migration.new(
+            source => $s,
+            up     => self.statement($s),
+            down   => self.statement($s, :back),
+            indent => $!indent,
+        );
     }
 
     method create-table(Match:D $s --> Str) {
         my ($table, $create) = $s<table create_table_body>;
         [~] '$tableOptions = null;', "\n",
-            INDENT x 2, q[if ($this->db->driverName === 'mysql') {], "\n",
-            INDENT x 3, '// https://stackoverflow.com/q/766809', "\n",
-            INDENT x 3, q[$tableOptions = 'CHARACTER SET utf8 COLLATE utf8_unicode_ci ENGINE=InnoDB';], "\n",
-            INDENT x 2, "}\n",
+            $!indent x 2, q[if ($this->db->driverName === 'mysql') {], "\n",
+            $!indent x 3, '// https://stackoverflow.com/q/766809', "\n",
+            $!indent x 3, q[$tableOptions = 'CHARACTER SET utf8 COLLATE utf8_unicode_ci ENGINE=InnoDB';], "\n",
+            $!indent x 2, "}\n",
             "\n",
-            INDENT x 2, '$this->createTable(', self.table-string($table), ", [\n",
-            INDENT x 3,
+            $!indent x 2, '$this->createTable(', self.table-string($table), ", [\n",
+            $!indent x 3,
             $create<column_definition>.list.map({
                 my ($name, $type) = .hash<name type>;
                 [~] self.string($name.Str), ' => ', self.column-type($type), ',';
-            }).join("\n" ~ INDENT x 3),
+            }).join("\n" ~ $!indent x 3),
             "\n",
-            INDENT x 2, '], $tableOptions);';
+            $!indent x 2, '], $tableOptions);';
     }
     method drop-table(Match:D $s --> Str) {
         my ($table) = $s<table>;
@@ -348,10 +374,10 @@ class Yii2Format does TransformFormat {
         my ($table, $add_col) = $s<table add_column_body>;
         my ($column, $type_pos) = $add_col<name alter_column_type>;
         [~] '$this->addColumn(', "\n",
-            INDENT x 3, self.table-string($table), ",\n",
-            INDENT x 3, self.string($column.Str), ",\n",
-            INDENT x 3, self.column-type-pos($type_pos), "\n",
-            INDENT x 2, ');';
+            $!indent x 3, self.table-string($table), ",\n",
+            $!indent x 3, self.string($column.Str), ",\n",
+            $!indent x 3, self.column-type-pos($type_pos), "\n",
+            $!indent x 2, ');';
     }
     method drop-column(Match:D $s --> Str) {
         my ($table, $add_col) = $s<table add_column_body>;
@@ -385,43 +411,43 @@ class Yii2Format does TransformFormat {
     method !index-common(Match:D $s, Str $method, Str $prefix, Bool:D :$cols = False, Str :$tag --> Str) {
         my ($alias, $ref) = $s<alias table_columns_ref>;
         [~] '$this->', $method, "(\n",
-            INDENT x 3, self.string(self.index-name($prefix, $alias, $ref)), ",\n",
-            INDENT x 3, self.table-string($ref<table>),
+            $!indent x 3, self.string(self.index-name($prefix, $alias, $ref)), ",\n",
+            $!indent x 3, self.table-string($ref<table>),
             $cols
                 ?? (
                     ",\n",
-                    INDENT x 3, '[',
+                    $!indent x 3, '[',
                     $ref<columns>.list.map({ self.string(.Str) }).join(', '),
                     ']'
                 ).join('')
                 !! '',
             $tag
-                ?? (",\n", INDENT x 3, $tag).join('')
+                ?? (",\n", $!indent x 3, $tag).join('')
                 !! '',
             "\n",
-            INDENT x 2, ');';
+            $!indent x 2, ');';
     }
 
     method add-foreigh-key (Match:D $s, Bool:D :$back = False --> Str) {
         my ($a, $f, $t, $d, $u) = $s<alias source target fk_on_delete fk_on_update>;
         ($f, $t) = $t, $f if $back;
         [~] '$this->addForeignKey(', "\n",
-            INDENT x 3, self.string(self.index-name(S_FK, $a, $f, $t)), ",\n",
-            INDENT x 3, self.table-string($f<table>), ', [',
+            $!indent x 3, self.string(self.index-name(S_FK, $a, $f, $t)), ",\n",
+            $!indent x 3, self.table-string($f<table>), ', [',
             $f<columns>.list.map({ self.string(.Str) }).join(', '), "],\n",
-            INDENT x 3, self.table-string($t<table>), ', [',
+            $!indent x 3, self.table-string($t<table>), ', [',
             $t<columns>.list.map({ self.string(.Str) }).join(', '), "],\n",
-            INDENT x 3, self.fk-action-string($d), ",\n",
-            INDENT x 3, self.fk-action-string($u), "\n",
-            INDENT x 2, ');';
+            $!indent x 3, self.fk-action-string($d), ",\n",
+            $!indent x 3, self.fk-action-string($u), "\n",
+            $!indent x 2, ');';
     }
     method drop-foreign-key(Match:D $s, Bool:D :$back = False --> Str) {
         my ($a, $f, $t) = $s<alias source target>;
         ($f, $t) = $t, $f if $back;
         [~] '$this->dropForeignKey(', "\n",
-            INDENT x 3, self.string(self.index-name(S_FK, $a, $f, $t)), ",\n",
-            INDENT x 3, self.table-string($f<table>), "\n",
-            INDENT x 2, ');';
+            $!indent x 3, self.string(self.index-name(S_FK, $a, $f, $t)), ",\n",
+            $!indent x 3, self.table-string($f<table>), "\n",
+            $!indent x 2, ');';
     }
     submethod index-name(Str $prefix, $alias, *@table-col-refs --> Str) {
         return $alias<name>.Str if $alias ~~ Match:D;
@@ -436,7 +462,7 @@ class Yii2Format does TransformFormat {
         for @tables {
             $_ = self.table($_);
         }
-        @columns>>.=Str;
+        @columns».=Str;
         # $*ERR.say($(:@tables, :@columns).perl);
 
         my @refs = (@tables Z @columns).flat;
@@ -476,14 +502,17 @@ class Yii2Format does TransformFormat {
         $name .= Str;
         my $type = $spec{$back ?? 'from' !! 'to'};
         [~] '$this->alterColumn(', "\n",
-            INDENT x 3, self.table-string($table), ",\n",
-            INDENT x 3, self.string($name), ",\n",
-            INDENT x 3, self.column-type-pos($type), "\n",
-            INDENT x 2, ');';
+            $!indent x 3, self.table-string($table), ",\n",
+            $!indent x 3, self.string($name), ",\n",
+            $!indent x 3, self.column-type-pos($type), "\n",
+            $!indent x 2, ');';
     }
 
     method data-statement(Match:D $s, Bool:D :$back = False --> Str) {
-        return [~] '// ', $back ?? 'undo' !! 'update';
+        [~] '// TODO: ',
+            $back
+                ?? 'undo that updates'
+                !! 'add some updates';
     }
 
     submethod column-type-pos(Match:D $t --> Str) {
@@ -498,8 +527,8 @@ class Yii2Format does TransformFormat {
         my ($name, $params, $null, $default) = $t<name params null_mark default_value>;
         $name .= Str;
         $params = $params
-            ?? $params<number>.list>>.Str
-            !! [];
+            ?? $params<number>».Str.join(', ')
+            !! '';
 
         %types{$name}:exists or die "unknown type `$name`";
         my ($type, $appendix, $defined) = do given %types{$name} {
@@ -511,9 +540,8 @@ class Yii2Format does TransformFormat {
                 die "bad type declaration for `$name`";
             }
         };
-        $type = $name if True === $type;
 
-        my $ret = [~] '$this->', $type, '(', $params.join(', '), ')';
+        my $ret = [~] '$this->', $type, '(', $params, ')';
         if $defined {
             with $null {
                 self.throw-unsupported(
@@ -563,7 +591,8 @@ sub transform(IO::Handle $input, TransformFormat $format) {
         }
         $statement or abort "cannot match at line $line_number\n";
         try {
-            print $format.export-migration($statement);
+            my $migration = $format.export-migration($statement);
+            say $migration;
             CATCH {
                 when X::App::Unsupported {
                     abort "unsupported: $_ - at line $line_number";
@@ -574,5 +603,5 @@ sub transform(IO::Handle $input, TransformFormat $format) {
 }
 
 sub MAIN() {
-    transform($*IN, Yii2Format);
+    transform($*IN, Yii2Format.new(indent => ' ' x 4));
 }
