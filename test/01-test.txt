@@ -1,0 +1,28 @@
++%table-name (id:primary, name:string(255), state:bool()?, a:bool=TRUE, b:int(10)?=NULL, name:string(16)?='default \'string\\ value')
++%table.foo:int(11)?=0
++%table.foo:int(11) ^
++%table.foo:int(11) >bar
+
++PK @idx-primary %table.id
++U @idx-table-name %table.name
++U @idx-table-name %table(name)
++I @idx-table-foo-bar %table(foo,bar)
++I %table.foo
++I %table(foo,bar)
+
++FK %child.parent_id => %parent.id ~! *!
++FK %child(parent_id) => %parent(id) ~> *>
++FK @fk-child-parent %child.foo => %parent(foo)
++FK @fk-child-parent %child(foo) => %parent.foo ~?
++FK @fk-child-parent %child(foo,bar) => %parent(foo,bar) *>
++FK %child(foo,bar) => %parent(foo,bar)
+-FK %child-is-long(foo-is-long-too,bar) => %parent(foo,bar)
+-FK %child-is-long(foo-is-long-too,bar-also-much-long) => %parent(foo,bar)
+-FK %child-is-long(foo-is-long-too,bar-also-much-long) => %parent-is-more-long(foo,bar)
+
+-%table (name:string(64))
+*%table => %bar
+*%table.foo => bar
+*%table.foo:decimal(20,2) > bar => :decimal(20,10)? > baz
+
+=
