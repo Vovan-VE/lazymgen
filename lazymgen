@@ -6,7 +6,9 @@ my constant $PROJECT_NAME = 'Lazy Migration Generator';
 my constant $PROJECT_VER  = '0.0.1';
 
 class X::App::MatchFail is X::AdHoc {}
-class X::App::Unsupported is X::AdHoc {}
+class X::App::Runtime is X::AdHoc {}
+class X::App::Unsupported is X::App::Runtime {}
+class X::App::IO is X::App::Runtime {}
 
 class X::App::Abort is X::AdHoc {
     multi method gist(X::App::Abort:D:) { $.payload }
@@ -679,6 +681,55 @@ class Yii2Format does TransformFormat {
     }
 }
 
+class Yii2Exporter does MigrationExporter {
+    has IO::Path:D $.path is required;
+
+    has DateTime $!time;
+
+    submethod TWEAK() {
+        $!time = DateTime.now(
+            timezone  => 0,
+            formatter => {
+                sprintf "%04d%02d%02d_%02d%02d%02d", .year, .month, .day, .hour, .minute, .second;
+            },
+        );
+    }
+
+    method export(Yii2Migration:D $migration) {
+        my $class_name = 'm' ~ $!time.Str ~ '_' ~ $migration.up.name.subst('-', '_', :g);
+        my IO::Path $filename = $!path.add($class_name ~ ".php");
+        die "file already exists - `$filename`" if $filename.e;
+
+        my $body = '';
+        $body ~= "// $_".trim ~ "\n" for $migration.header;
+        $body ~= "\n" if $migration.header.elems;
+        $body ~=
+            "public function up()\n" ~
+            "\{\n" ~
+            $migration.up.code.indent(4) ~ "\n" ~
+            "}\n\n" ~
+            "public function down()\n" ~
+            "\{\n" ~
+            $migration.down.code.indent(4) ~ "\n" ~
+            '}';
+
+        my $code = '<?php' ~ "\n\n" ~ 'use yii\db\Migration;' ~ "\n\n" ~
+            "class $class_name extends Migration\n" ~
+            "\{\n" ~
+            $body.indent(4) ~ "\n" ~
+            "}\n";
+
+        unless ' ' x 4 eq $migration.indent {
+            $code.=subst(/^^(' ' ** 4)+/, { $migration.indent x $0.elems }, :g);
+        }
+
+        $filename.spurt($code, :createonly)
+            or X::App::IO.new(pyload => "cannot create file - `$filename`");
+
+        $!time.=later(:5second);
+    }
+}
+
 sub transform(IO::Handle :$input, TransformFormat :$format, MigrationExporter :$exporter) {
     my Int $line_number = 0;
     for $input.lines -> $line {
@@ -698,8 +749,8 @@ sub transform(IO::Handle :$input, TransformFormat :$format, MigrationExporter :$
             my $migration = $format.make-migration($statement);
             $exporter.export($migration);
             CATCH {
-                when X::App::Unsupported {
-                    abort "unsupported: $_ - at line $line_number";
+                when X::App::Runtime {
+                    abort "{.^name}: $_ - at line $line_number";
                 }
             }
         }
@@ -710,6 +761,7 @@ sub MAIN() {
     transform(
         input    => $*IN,
         format   => Yii2Format.new(indent => ' ' x 4),
-        exporter => DebugExporter.new,
+        # exporter => DebugExporter.new,
+        exporter => Yii2Exporter.new(path => '.'.IO.add('migrations')),
     );
 }
