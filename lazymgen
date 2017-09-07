@@ -771,11 +771,32 @@ sub transform(IO::Handle :$input, TransformFormat :$format, MigrationExporter :$
     }
 }
 
-sub MAIN() {
+my constant DEFAULT_INDENT = ' ' x 4;
+
+multi sub MAIN('yii2',
+    Str:D :$path   = './migrations',
+    Str:D :$indent = DEFAULT_INDENT,
+) {
+    my $path_io = $path.IO;
+    with $path_io {
+        unless .e && .d {
+            abort "given path either does not exist or is not a directory - {.self}";
+        }
+    }
+
     transform(
         input    => $*IN,
-        format   => Yii2Format.new(indent => ' ' x 4),
-        # exporter => DebugExporter.new,
-        exporter => Yii2Exporter.new(path => '.'.IO.add('migrations')),
+        format   => Yii2Format.new(:$indent),
+        exporter => Yii2Exporter.new(path => $path_io),
+    );
+}
+
+multi sub MAIN(
+    Str:D :$indent = DEFAULT_INDENT,
+) {
+    transform(
+        input    => $*IN,
+        format   => Yii2Format.new(:$indent),
+        exporter => DebugExporter.new,
     );
 }
