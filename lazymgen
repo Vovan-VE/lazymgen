@@ -731,6 +731,7 @@ class Yii2Exporter does MigrationExporter {
 }
 
 sub transform(IO::Handle :$input, TransformFormat :$format, MigrationExporter :$exporter) {
+    my @migrations;
     my Int $line_number = 0;
     for $input.lines -> $line {
         ++$line_number;
@@ -746,11 +747,24 @@ sub transform(IO::Handle :$input, TransformFormat :$format, MigrationExporter :$
         }
         $statement or abort "cannot match at line $line_number\n";
         try {
-            my $migration = $format.make-migration($statement);
-            $exporter.export($migration);
+            @migrations.push({
+                migration => $format.make-migration($statement),
+                line => $line_number,
+            });
             CATCH {
                 when X::App::Runtime {
                     abort "{.^name}: $_ - at line $line_number";
+                }
+            }
+        }
+    }
+
+    for @migrations -> $item {
+        try {
+            $exporter.export($item<migration>);
+            CATCH {
+                when X::App::Runtime {
+                    abort "{.^name}: $_ - at line $item<line>";
                 }
             }
         }
