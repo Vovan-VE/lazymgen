@@ -366,6 +366,7 @@ class Yii2Format does TransformFormat {
         int          => 'integer',
         uint         => ['integer', UNSIGNED],
         bigint       => 'bigInteger',
+        int64        => 'bigInteger',
         uint64       => ['bigInteger', UNSIGNED],
         float        => True,
         double       => True,
@@ -388,6 +389,10 @@ class Yii2Format does TransformFormat {
     my constant S_FK = 'fk';
     my constant S_PK = 'pk';
     my constant S_IDX = 'idx';
+
+    method data-types(--> Iterable) {
+        %types.keys;
+    }
 
     method make-migration(Match:D $s --> Migration) {
         Yii2Migration.new(
@@ -776,7 +781,13 @@ my constant DEFAULT_INDENT = ' ' x 4;
 multi sub MAIN('yii2',
     Str:D :$path   = './migrations',
     Str:D :$indent = DEFAULT_INDENT,
+    Bool:D :$list-types = False,
 ) {
+    if $list-types {
+        .put for Yii2Format.data-types.sort;
+        exit 0;
+    }
+
     my $path_io = $path.IO;
     with $path_io {
         unless .e && .d {
