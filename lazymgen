@@ -146,10 +146,19 @@ grammar MigrationSource {
     }
 }
 
+class Statement {
+    has Str:D $.name = '';
+    has Str:D $.code = '';
+
+    multi method gist(Statement: --> Str) {
+        "`$!name`\n    ⟨$!code⟩";
+    }
+}
+
 class Migration {
-    has Match:D $.source is required;
-    has Str:D $.up = '';
-    has Str:D $.down = '';
+    has Match:D     $.source is required;
+    has Statement:D $.up     is required;
+    has Statement:D $.down   is required;
 }
 
 role TransformFormat {
@@ -162,32 +171,32 @@ role TransformFormat {
         );
     }
 
-    method create-table(Match:D $s --> Str) {...}
-    method drop-table  (Match:D $s --> Str) {...}
+    method create-table(Match:D $s --> Statement) {...}
+    method drop-table  (Match:D $s --> Statement) {...}
 
-    method add-column (Match:D $s --> Str) {...}
-    method drop-column(Match:D $s --> Str) {...}
+    method add-column (Match:D $s --> Statement) {...}
+    method drop-column(Match:D $s --> Statement) {...}
 
-    method add-primary-key (Match:D $s --> Str) {...}
-    method drop-primary-key(Match:D $s --> Str) {...}
+    method add-primary-key (Match:D $s --> Statement) {...}
+    method drop-primary-key(Match:D $s --> Statement) {...}
 
-    method add-unique-key (Match:D $s --> Str) {...}
-    method drop-unique-key(Match:D $s --> Str) {...}
+    method add-unique-key (Match:D $s --> Statement) {...}
+    method drop-unique-key(Match:D $s --> Statement) {...}
 
-    method add-index (Match:D $s --> Str) {...}
-    method drop-index(Match:D $s --> Str) {...}
+    method add-index (Match:D $s --> Statement) {...}
+    method drop-index(Match:D $s --> Statement) {...}
 
-    method add-foreigh-key (Match:D $s, Bool:D :$back = False --> Str) {...}
-    method drop-foreign-key(Match:D $s, Bool:D :$back = False --> Str) {...}
+    method add-foreigh-key (Match:D $s, Bool:D :$back = False --> Statement) {...}
+    method drop-foreign-key(Match:D $s, Bool:D :$back = False --> Statement) {...}
 
-    method rename-table(Match:D $s, Bool:D :$back = False --> Str) {...}
+    method rename-table(Match:D $s, Bool:D :$back = False --> Statement) {...}
 
-    method alter-column-name(Match:D $s, Bool:D :$back = False --> Str) {...}
-    method alter-column-type(Match:D $s, Bool:D :$back = False --> Str) {...}
+    method alter-column-name(Match:D $s, Bool:D :$back = False --> Statement) {...}
+    method alter-column-type(Match:D $s, Bool:D :$back = False --> Statement) {...}
 
-    method data-statement(Match:D $s, Bool:D :$back = False --> Str) {...}
+    method data-statement(Match:D $s, Bool:D :$back = False --> Statement) {...}
 
-    method statement(Match:D $s, Bool:D :$back = False --> Str) {
+    method statement(Match:D $s, Bool:D :$back = False --> Statement) {
         my $caps = $s.caps;
         unless 1 === $caps.elems {
             die "expected Match under `<statement>` but got `{$s.caps[0]}`";
@@ -219,7 +228,7 @@ role TransformFormat {
         }
     }
 
-    submethod ddl-statement(Match:D $s, Bool:D :$back = False --> Str) {
+    method ddl-statement(Match:D $s, Bool:D :$back = False --> Statement) {
         given $s.caps[0] {
             when .key eq 'table_ddl_statement' {
                 if .value<create_table_body>:exists {
@@ -285,14 +294,16 @@ class Yii2Migration is Migration {
 
     multi method gist(Yii2Migration: --> Str) {
         [~] '=' x 20, "\{\n",
+            $!indent, 'NAME', '-' x 10, "\n",
+            $!indent x 2, self.up.name, "\n",
             $!indent, 'HEAD', '-' x 10, "\n",
             $!indent, "// generated with $PROJECT_NAME/$PROJECT_VER from statement:\n",
             $!indent, "//\n",
             $!indent, '// ', self.source.Str, "\n",
             $!indent, 'UP', '-' x 12, "\n",
-            $!indent x 2, self.up, "\n",
+            $!indent x 2, self.up.code, "\n",
             $!indent, 'DOWN', '-' x 10, "\n",
-            $!indent x 2, self.down, "\n",
+            $!indent x 2, self.down.code, "\n",
             "}";
     }
 }
@@ -348,108 +359,144 @@ class Yii2Format does TransformFormat {
         );
     }
 
-    method create-table(Match:D $s --> Str) {
+    method create-table(Match:D $s --> Statement) {
         my ($table, $create) = $s<table create_table_body>;
-        [~] '$tableOptions = null;', "\n",
-            $!indent x 2, q[if ($this->db->driverName === 'mysql') {], "\n",
-            $!indent x 3, '// https://stackoverflow.com/q/766809', "\n",
-            $!indent x 3, q[$tableOptions = 'CHARACTER SET utf8 COLLATE utf8_unicode_ci ENGINE=InnoDB';], "\n",
-            $!indent x 2, "}\n",
-            "\n",
-            $!indent x 2, '$this->createTable(', self.table-string($table), ", [\n",
-            $!indent x 3,
-            $create<column_definition>.list.map({
-                my ($name, $type) = .hash<name type>;
-                [~] self.string($name.Str), ' => ', self.column-type($type), ',';
-            }).join("\n" ~ $!indent x 3),
-            "\n",
-            $!indent x 2, '], $tableOptions);';
+        Statement.new(
+            :name("create_{$table<name>}"),
+            :code(
+                [~] '$tableOptions = null;', "\n",
+                    $!indent x 2, q[if ($this->db->driverName === 'mysql') {], "\n",
+                    $!indent x 3, '// https://stackoverflow.com/q/766809', "\n",
+                    $!indent x 3, q[$tableOptions = 'CHARACTER SET utf8 COLLATE utf8_unicode_ci ENGINE=InnoDB';], "\n",
+                    $!indent x 2, "}\n",
+                    "\n",
+                    $!indent x 2, '$this->createTable(', self.table-string($table), ", [\n",
+                    $!indent x 3,
+                    $create<column_definition>.list.map({
+                        my ($name, $type) = .hash<name type>;
+                        [~] self.string($name.Str), ' => ', self.column-type($type), ',';
+                    }).join("\n" ~ $!indent x 3),
+                    "\n",
+                    $!indent x 2, '], $tableOptions);',
+            ),
+        );
     }
-    method drop-table(Match:D $s --> Str) {
+    method drop-table(Match:D $s --> Statement) {
         my ($table) = $s<table>;
-        [~] '$this->dropTable(', self.table-string($table), ');';
+        Statement.new(
+            :name("drop_{$table<name>}"),
+            :code([~] '$this->dropTable(', self.table-string($table), ');')
+        );
     }
 
-    method add-column(Match:D $s --> Str) {
+    method add-column(Match:D $s --> Statement) {
         my ($table, $add_col) = $s<table add_column_body>;
         my ($column, $type_pos) = $add_col<name alter_column_type>;
-        [~] '$this->addColumn(', "\n",
-            $!indent x 3, self.table-string($table), ",\n",
-            $!indent x 3, self.string($column.Str), ",\n",
-            $!indent x 3, self.column-type-pos($type_pos), "\n",
-            $!indent x 2, ');';
+        Statement.new(
+            :name("add_{$table<name>}_$column"),
+            :code(
+                [~] '$this->addColumn(', "\n",
+                    $!indent x 3, self.table-string($table), ",\n",
+                    $!indent x 3, self.string($column.Str), ",\n",
+                    $!indent x 3, self.column-type-pos($type_pos), "\n",
+                    $!indent x 2, ');',
+            )
+        );
     }
-    method drop-column(Match:D $s --> Str) {
+    method drop-column(Match:D $s --> Statement) {
         my ($table, $add_col) = $s<table add_column_body>;
         my ($column) = $add_col<name>;
-        [~] '$this->dropColumn(',
-            self.table-string($table), ', ',
-            self.string($column.Str), ');';
+        Statement.new(
+            :name("drop_{$table<name>}_$column"),
+            :code(
+                [~] '$this->dropColumn(',
+                    self.table-string($table), ', ',
+                    self.string($column.Str), ');'
+            )
+        );
     }
 
-    method add-primary-key(Match:D $s --> Str) {
-        self!index-common($s, 'addPrimaryKey', S_PK, :cols);
+    method add-primary-key(Match:D $s --> Statement) {
+        self!index-common($s, 'add_', 'addPrimaryKey', S_PK, :cols);
     }
-    method drop-primary-key(Match:D $s --> Str) {
-        self!index-common($s, 'dropPrimaryKey', S_PK);
-    }
-
-    method add-unique-key(Match:D $s --> Str) {
-        self!index-common($s, 'createIndex', S_IDX, :cols, :tag<true>);
-    }
-    method drop-unique-key(Match:D $s --> Str) {
-        self!index-common($s, 'dropIndex', S_IDX);
+    method drop-primary-key(Match:D $s --> Statement) {
+        self!index-common($s, 'drop_', 'dropPrimaryKey', S_PK);
     }
 
-    method add-index(Match:D $s --> Str) {
-        self!index-common($s, 'createIndex', S_IDX, :cols, :tag<false>);
+    method add-unique-key(Match:D $s --> Statement) {
+        self!index-common($s, 'add_', 'createIndex', S_IDX, :cols, :tag<true>);
     }
-    method drop-index(Match:D $s --> Str) {
-        self!index-common($s, 'dropIndex', S_IDX);
+    method drop-unique-key(Match:D $s --> Statement) {
+        self!index-common($s, 'drop_', 'dropIndex', S_IDX);
     }
 
-    method !index-common(Match:D $s, Str $method, Str $prefix, Bool:D :$cols = False, Str :$tag --> Str) {
+    method add-index(Match:D $s --> Statement) {
+        self!index-common($s, 'add_', 'createIndex', S_IDX, :cols, :tag<false>);
+    }
+    method drop-index(Match:D $s --> Statement) {
+        self!index-common($s, 'drop_', 'dropIndex', S_IDX);
+    }
+
+    method !index-common(Match:D $s, Str $namePrefix, Str $method, Str $prefix, Bool:D :$cols = False, Str :$tag --> Statement) {
         my ($alias, $ref) = $s<alias table_columns_ref>;
-        [~] '$this->', $method, "(\n",
-            $!indent x 3, self.string(self.index-name($prefix, $alias, $ref)), ",\n",
-            $!indent x 3, self.table-string($ref<table>),
-            $cols
-                ?? (
-                    ",\n",
-                    $!indent x 3, '[',
-                    $ref<columns>.list.map({ self.string(.Str) }).join(', '),
-                    ']'
-                ).join('')
-                !! '',
-            $tag
-                ?? (",\n", $!indent x 3, $tag).join('')
-                !! '',
-            "\n",
-            $!indent x 2, ');';
+        my $index_name = self.index-name($prefix, $alias, $ref);
+        Statement.new(
+            :name($namePrefix ~ $index_name),
+            :code(
+                [~] '$this->', $method, "(\n",
+                    $!indent x 3, self.string($index_name), ",\n",
+                    $!indent x 3, self.table-string($ref<table>),
+                    $cols
+                        ?? (
+                            ",\n",
+                            $!indent x 3, '[',
+                            $ref<columns>.list.map({ self.string(.Str) }).join(', '),
+                            ']'
+                        ).join('')
+                        !! '',
+                    $tag
+                        ?? (",\n", $!indent x 3, $tag).join('')
+                        !! '',
+                    "\n",
+                    $!indent x 2, ');',
+            )
+        );
     }
 
-    method add-foreigh-key (Match:D $s, Bool:D :$back = False --> Str) {
+    method add-foreigh-key(Match:D $s, Bool:D :$back = False --> Statement) {
         my ($a, $f, $t, $d, $u) = $s<alias source target fk_on_delete fk_on_update>;
         ($f, $t) = $t, $f if $back;
-        [~] '$this->addForeignKey(', "\n",
-            $!indent x 3, self.string(self.index-name(S_FK, $a, $f, $t)), ",\n",
-            $!indent x 3, self.table-string($f<table>), ', [',
-            $f<columns>.list.map({ self.string(.Str) }).join(', '), "],\n",
-            $!indent x 3, self.table-string($t<table>), ', [',
-            $t<columns>.list.map({ self.string(.Str) }).join(', '), "],\n",
-            $!indent x 3, self.fk-action-string($d), ",\n",
-            $!indent x 3, self.fk-action-string($u), "\n",
-            $!indent x 2, ');';
+        my $index_name = self.index-name(S_FK, $a, $f, $t);
+        Statement.new(
+            :name("add_$index_name"),
+            :code(
+                [~] '$this->addForeignKey(', "\n",
+                    $!indent x 3, self.string($index_name), ",\n",
+                    $!indent x 3, self.table-string($f<table>), ', [',
+                    $f<columns>.list.map({ self.string(.Str) }).join(', '), "],\n",
+                    $!indent x 3, self.table-string($t<table>), ', [',
+                    $t<columns>.list.map({ self.string(.Str) }).join(', '), "],\n",
+                    $!indent x 3, self.fk-action-string($d), ",\n",
+                    $!indent x 3, self.fk-action-string($u), "\n",
+                    $!indent x 2, ');',
+            )
+        );
     }
-    method drop-foreign-key(Match:D $s, Bool:D :$back = False --> Str) {
+    method drop-foreign-key(Match:D $s, Bool:D :$back = False --> Statement) {
         my ($a, $f, $t) = $s<alias source target>;
         ($f, $t) = $t, $f if $back;
-        [~] '$this->dropForeignKey(', "\n",
-            $!indent x 3, self.string(self.index-name(S_FK, $a, $f, $t)), ",\n",
-            $!indent x 3, self.table-string($f<table>), "\n",
-            $!indent x 2, ');';
+        my $index_name = self.index-name(S_FK, $a, $f, $t);
+        Statement.new(
+            :name("drop_$index_name"),
+            :code(
+                [~] '$this->dropForeignKey(', "\n",
+                    $!indent x 3, self.string($index_name), ",\n",
+                    $!indent x 3, self.table-string($f<table>), "\n",
+                    $!indent x 2, ');',
+            )
+        );
     }
-    submethod index-name(Str $prefix, $alias, *@table-col-refs --> Str) {
+    method index-name(Str $prefix, $alias, *@table-col-refs --> Str) {
         return $alias<name>.Str if $alias ~~ Match:D;
         my @tables;
         my @columns;
@@ -476,46 +523,66 @@ class Yii2Format does TransformFormat {
         die "too long index name in any case";
     }
 
-    method rename-table(Match:D $s, Bool:D :$back = False --> Str) {
+    method rename-table(Match:D $s, Bool:D :$back = False --> Statement) {
         my ($from_table, $to_table) = $s<table rename_table>;
         $to_table = $to_table<table>;
         ($from_table, $to_table) = $to_table, $from_table if $back;
-        [~] '$this->renameTable(',
-            self.table-string($from_table), ', ',
-            self.table-string($to_table), ');';
+        Statement.new(
+            :name("rename_{$from_table<name>}_{$to_table<name>}"),
+            :code(
+                [~] '$this->renameTable(',
+                    self.table-string($from_table), ', ',
+                    self.table-string($to_table), ');',
+            )
+        );
     }
 
-    method alter-column-name(Match:D $s, Bool:D :$back = False --> Str) {
+    method alter-column-name(Match:D $s, Bool:D :$back = False --> Statement) {
         my $table = $s<table>;
         my ($from_name, $to_name) = $s<alter_column><name alter_column_spec>;
         $from_name .= Str;
         $to_name = $to_name<alter_column_name><name>.Str;
         ($from_name, $to_name) = $to_name, $from_name if $back;
-        [~] '$this->renameColumn(',
-            self.table-string($table), ', ',
-            self.string($from_name), ', ',
-            self.string($to_name), ');';
+        Statement.new(
+            :name("rename_{$table<name>}_{$from_name}_{$to_name}"),
+            :code(
+                [~] '$this->renameColumn(',
+                    self.table-string($table), ', ',
+                    self.string($from_name), ', ',
+                    self.string($to_name), ');',
+            )
+        );
     }
-    method alter-column-type(Match:D $s, Bool:D :$back = False --> Str) {
+    method alter-column-type(Match:D $s, Bool:D :$back = False --> Statement) {
         my $table = $s<table>;
         my ($name, $spec) = $s<alter_column><name alter_column_spec>;
         $name .= Str;
         my $type = $spec{$back ?? 'from' !! 'to'};
-        [~] '$this->alterColumn(', "\n",
-            $!indent x 3, self.table-string($table), ",\n",
-            $!indent x 3, self.string($name), ",\n",
-            $!indent x 3, self.column-type-pos($type), "\n",
-            $!indent x 2, ');';
+        Statement.new(
+            :name("alter_{$table<name>}_$name"),
+            :code(
+                [~] '$this->alterColumn(', "\n",
+                    $!indent x 3, self.table-string($table), ",\n",
+                    $!indent x 3, self.string($name), ",\n",
+                    $!indent x 3, self.column-type-pos($type), "\n",
+                    $!indent x 2, ');',
+            )
+        );
     }
 
-    method data-statement(Match:D $s, Bool:D :$back = False --> Str) {
-        [~] '// TODO: ',
-            $back
-                ?? 'undo that updates'
-                !! 'add some updates';
+    method data-statement(Match:D $s, Bool:D :$back = False --> Statement) {
+        Statement.new(
+            :name('update')
+            :code(
+                [~] '// TODO: ',
+                    $back
+                        ?? 'undo that updates'
+                        !! 'add some updates',
+            ),
+        );
     }
 
-    submethod column-type-pos(Match:D $t --> Str) {
+    method column-type-pos(Match:D $t --> Str) {
         my ($type, $pos) = $t<type position>;
         $type = self.column-type($type);
         return $type without $pos;
@@ -523,7 +590,7 @@ class Yii2Format does TransformFormat {
         return $type ~ '->after(' ~ self.string($pos<name>.Str) ~ ')';
     }
 
-    submethod column-type(Match:D $t --> Str) {
+    method column-type(Match:D $t --> Str) {
         my ($name, $params, $null, $default) = $t<name params null_mark default_value>;
         $name .= Str;
         $params = $params
