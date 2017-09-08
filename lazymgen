@@ -695,7 +695,7 @@ class Yii2Exporter does MigrationExporter {
         $!time = DateTime.now(
             timezone  => 0,
             formatter => {
-                sprintf "%04d%02d%02d_%02d%02d%02d", .year, .month, .day, .hour, .minute, .second;
+                sprintf "%02d%02d%02d_%02d%02d%02d", .year % 100, .month, .day, .hour, .minute, .second;
             },
         );
     }
