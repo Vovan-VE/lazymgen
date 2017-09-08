@@ -35,7 +35,7 @@ grammar MigrationSource {
     token null_mark { '?' }
 
     rule default_value {
-        '=' ~ [
+        ['=' <!before '>'>] ~ [
             [<number> | <string>]
             || <value_keyword>
         ] <?> }

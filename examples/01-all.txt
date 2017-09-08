@@ -30,6 +30,7 @@
 
 *%table => %bar
 *%table.foo => bar
+*%table.foo:decimal(20,2) => :decimal(20,10)?
 *%table.foo:decimal(20,2) > bar => :decimal(20,10)? > baz
 
 =
