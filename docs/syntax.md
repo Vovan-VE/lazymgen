@@ -4,13 +4,13 @@ Script Syntax
 One **statement** goes in separate line. Whitespaces are ignored. Empty lines
 are ignored.
 
-Currently there is **no comments** as it not needed. Script is for one use
-mostly.
+Currently there is no support for **comments** as it not needed. Script is for
+one use mostly.
 
 **Identifiers** are used for table, columns and data type names. Identifiers are
 very close to CSS identifiers. It may contain latin letters, digits, underscores
-and dashes literally. First synbol cannot be digit or dash. Dash also cannot be
-the last synbol. Also any synbol can be escaped with `\` and so be used anywhere
+and dashes literally. First symbol cannot be digit or dash. Dash also cannot be
+the last symbol. Also any symbol can be escaped with `\` and so be used anywhere
 in an identifier same as a letter. Examples: `foo42`, `lorem-ipsum`, `x\.y\.z`,
 `\--foo-\-`.
 
@@ -33,16 +33,16 @@ _Note:_ Whitespaces are optional and can be inserted almost anywhere.
 
 Explanation:
 
-Input | Description
------ | -----------
+Input code | Description
+---------- | -----------
 `+` | CREATE
 `%table-name` | Table `table-name`
 `(` ... `)` | Wrap columns definition, separated by comma
 
-Column definition
+Column definition:
 
-Input | Description
------ | -----------
+Input code | Description
+---------- | -----------
 `foo` | Name
 `: data-type` | Data type. Exact data types depends on format
 `(42,37)` | Optional. Type parameters. Empty paranses are allowed too.
@@ -70,8 +70,8 @@ migration.
 
 Explanation:
 
-Input | Description
------ | -----------
+Input code | Description
+---------- | -----------
 `+` | CREATE
 `%table-name` | in table `table-name`
 `.` | separate table and following column
@@ -84,9 +84,9 @@ Input | Description
 Same as ADD COLUMN but begins with `-` instead of `+`:
 
 ```
-+ %table . column-name : data-type (42)
-+ %table . column-name : data-type ()   ^
-+ %table . column-name : data-type      > after-column
+- %table . column-name : data-type (42)
+- %table . column-name : data-type ()   ^
+- %table . column-name : data-type      > after-column
 ```
 
 Complete column definition is required in order to generate backward side of
@@ -103,8 +103,8 @@ migration.
 
 You already seen almost everything above. New here is:
 
-Input | Description
------ | -----------
+Input code | Description
+---------- | -----------
 `@key-name` | Optional. Name for the key. By default it will be generated from table and column(s) names like `pk-table-column1-column2`.
 
 #### DROP PRIMARY KEY
@@ -172,8 +172,8 @@ Default key name prefixed with `idx`.
 
 Mostly everithing is familar for you. New here are:
 
-Input | Description
------ | -----------
+Input code | Description
+---------- | -----------
 `=>` | Separate child table and columns from parent table and columns
 `~!` | Optional. ON DELETE RESTRICT
 `~>` | Optional. ON DELETE CASCADE
