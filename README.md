@@ -20,7 +20,7 @@ above.
 
 So, you need a number of tiny DDL migrations. What if you need to refactor
 database structure while it has many tables full of data? You probably will need
-to create 10, 20, more tine migrations.
+to create 10, 20, more migrations.
 
 Here comes Lazy Migration Generator. Write a single script with weird but short
 syntax full of stupit abbreviations/shortcuts. Feed the script to `lazymgen` and
@@ -30,19 +30,19 @@ it will generate migrations.
 Usage
 -----
 
-Project requires [Perl 6](perl6) interpretter available in `$PATH`.
+Project requires [Perl 6][perl6] interpretter available in `$PATH`.
 
 Input script will be read from input.
 
 ```sh
 # Debug conversion to output
-$ lazymgen < script.txt
+$ lazymgen < examples/01-all.txt
 
 # Generate Yii2 migrations (default path is ./migrations/)
-$ lazymgen yii2 < script.txt
+$ lazymgen yii2 < examples/01-all.txt
 
 # Generate Yii2 migrations in custom path
-$ lazymgen --path=path/to/migrations yii2 < script.txt
+$ lazymgen --path=path/to/migrations yii2 < examples/01-all.txt
 
 # See short usage hints
 $ lazymgen --help
