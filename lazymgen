@@ -22,15 +22,16 @@ grammar MigrationSource {
     token ws { <!ww> \h* }
 
     token number {
+        <[- +]>?
         [ 0 || <[1..9]> \d* ]
-        [ \. ~ \d+ <?> ]?
-        [ :i <[-+]>? e ~ \d+ <?> ]?
+        [ '.' \d+ ]?
+        [ :i <[-+]>? e <[- +]>? \d+ ]?
     }
-    token string { \' ~ \' [ <-[' \\]>+ || \\. ]* }
+    token string { \' ~ \' [ <-[' \\]>+ || \\ . ]* }
     token value_keyword { :i <<[TRUE|FALSE|NULL]>> }
     token name {
         <!before <[ - \d ]> >
-        [ <[ _ a..z \d ]>+ | \\. ]+ % '-'
+        [ [ <[ _ a..z \d ]>+ | \\ . ]+ ]+ % '-'
     }
     token null_mark { '?' }
 
@@ -152,11 +153,17 @@ class Statement {
     has Str:D $.name = '';
     has Str:D $.code = '';
 
+    submethod TWEAK() {
+        $!name = self.filter-name($!name);
+    }
+
     multi method gist(Statement: --> Str) {
         "`$!name` ⟨\n" ~
         $!code.indent(4) ~ "\n" ~
         "⟩";
     }
+
+    method filter-name(Str:D $name --> Str:D) { $name }
 }
 
 class Migration {
@@ -304,7 +311,7 @@ role TransformFormat {
     }
 
     method table(Match:D $t --> Str) {
-        return $t<name>.Str;
+        return self.name($t<name>);
     }
 
     method default-value(Match:D $v --> Str) {
@@ -315,6 +322,10 @@ role TransformFormat {
                 .substr(1, *-1)
                 .subst(/\\(.)/, { $0 }, :g)
         );
+    }
+
+    method name(Match:D $m --> Str) {
+        $m.Str.subst(/\\ (.)/, { $0 }, :g);
     }
 
     method string(Str:D $s --> Str) { $s }
@@ -333,6 +344,12 @@ class DebugExporter does MigrationExporter {
 
     method export(Migration:D $migration --> Bool) {
         $!to.say($migration);
+    }
+}
+
+class Yii2Statement is Statement {
+    method filter-name(Str:D $name --> Str:D) {
+        $name.subst(/ :i <-[ a..z \d ]>+ /, '_', :g);
     }
 }
 
@@ -403,10 +420,10 @@ class Yii2Format does TransformFormat {
         );
     }
 
-    method create-table(Match:D $s --> Statement) {
+    method create-table(Match:D $s --> Yii2Statement) {
         my ($table, $create) = $s<table create_table_body>;
-        Statement.new(
-            :name("create_{$table<name>}"),
+        Yii2Statement.new(
+            :name("create_{self.table($table)}"),
             :code(
                 [~] '$tableOptions = null;', "\n",
                     q[if ($this->db->driverName === 'mysql') {], "\n",
@@ -418,40 +435,40 @@ class Yii2Format does TransformFormat {
                     $!indent,
                     $create<column_definition>.list.map({
                         my ($name, $type) = .hash<name type>;
-                        [~] self.string($name.Str), ' => ', self.column-type($type), ',';
+                        [~] self.name-string($name), ' => ', self.column-type($type), ',';
                     }).join("\n" ~ $!indent),
                     "\n",
                     '], $tableOptions);',
             ),
         );
     }
-    method drop-table(Match:D $s --> Statement) {
+    method drop-table(Match:D $s --> Yii2Statement) {
         my ($table) = $s<table>;
-        Statement.new(
-            :name("drop_{$table<name>}"),
+        Yii2Statement.new(
+            :name("drop_{self.table($table)}"),
             :code([~] '$this->dropTable(', self.table-string($table), ');')
         );
     }
 
-    method add-column(Match:D $s --> Statement) {
+    method add-column(Match:D $s --> Yii2Statement) {
         my ($table, $add_col) = $s<table add_column_body>;
         my ($column, $type_pos) = $add_col<name alter_column_type>;
-        Statement.new(
-            :name("add_{$table<name>}_$column"),
+        Yii2Statement.new(
+            :name("add_{self.table($table)}_{self.name($column)}"),
             :code(
                 [~] '$this->addColumn(', "\n",
                     $!indent, self.table-string($table), ",\n",
-                    $!indent, self.string($column.Str), ",\n",
+                    $!indent, self.name-string($column), ",\n",
                     $!indent, self.column-type-pos($type_pos), "\n",
                     ');',
             )
         );
     }
-    method drop-column(Match:D $s --> Statement) {
+    method drop-column(Match:D $s --> Yii2Statement) {
         my ($table, $add_col) = $s<table add_column_body>;
         my ($column) = $add_col<name>;
-        Statement.new(
-            :name("drop_{$table<name>}_$column"),
+        Yii2Statement.new(
+            :name("drop_{self.table($table)}_{self.name($column)}"),
             :code(
                 [~] '$this->dropColumn(',
                     self.table-string($table), ', ',
@@ -460,31 +477,31 @@ class Yii2Format does TransformFormat {
         );
     }
 
-    method add-primary-key(Match:D $s --> Statement) {
+    method add-primary-key(Match:D $s --> Yii2Statement) {
         self!index-common($s, 'add_', 'addPrimaryKey', S_PK, :cols);
     }
-    method drop-primary-key(Match:D $s --> Statement) {
+    method drop-primary-key(Match:D $s --> Yii2Statement) {
         self!index-common($s, 'drop_', 'dropPrimaryKey', S_PK);
     }
 
-    method add-unique-key(Match:D $s --> Statement) {
+    method add-unique-key(Match:D $s --> Yii2Statement) {
         self!index-common($s, 'add_', 'createIndex', S_IDX, :cols, :tag<true>);
     }
-    method drop-unique-key(Match:D $s --> Statement) {
+    method drop-unique-key(Match:D $s --> Yii2Statement) {
         self!index-common($s, 'drop_', 'dropIndex', S_IDX);
     }
 
-    method add-index(Match:D $s --> Statement) {
+    method add-index(Match:D $s --> Yii2Statement) {
         self!index-common($s, 'add_', 'createIndex', S_IDX, :cols, :tag<false>);
     }
-    method drop-index(Match:D $s --> Statement) {
+    method drop-index(Match:D $s --> Yii2Statement) {
         self!index-common($s, 'drop_', 'dropIndex', S_IDX);
     }
 
-    method !index-common(Match:D $s, Str $namePrefix, Str $method, Str $prefix, Bool:D :$cols = False, Str :$tag --> Statement) {
+    method !index-common(Match:D $s, Str $namePrefix, Str $method, Str $prefix, Bool:D :$cols = False, Str :$tag --> Yii2Statement) {
         my ($alias, $ref) = $s<alias table_columns_ref>;
         my $index_name = self.index-name($prefix, $alias, $ref);
-        Statement.new(
+        Yii2Statement.new(
             :name($namePrefix ~ $index_name),
             :code(
                 [~] '$this->', $method, "(\n",
@@ -494,7 +511,7 @@ class Yii2Format does TransformFormat {
                         ?? (
                             ",\n",
                             $!indent, '[',
-                            $ref<columns>.list.map({ self.string(.Str) }).join(', '),
+                            $ref<columns>.list.join(', '),
                             ']'
                         ).join('')
                         !! '',
@@ -507,30 +524,30 @@ class Yii2Format does TransformFormat {
         );
     }
 
-    method add-foreigh-key(Match:D $s, Bool:D :$back = False --> Statement) {
+    method add-foreigh-key(Match:D $s, Bool:D :$back = False --> Yii2Statement) {
         my ($a, $f, $t, $d, $u) = $s<alias source target fk_on_delete fk_on_update>;
         ($f, $t) = $t, $f if $back;
         my $index_name = self.index-name(S_FK, $a, $f, $t);
-        Statement.new(
+        Yii2Statement.new(
             :name("add_$index_name"),
             :code(
                 [~] '$this->addForeignKey(', "\n",
                     $!indent, self.string($index_name), ",\n",
                     $!indent, self.table-string($f<table>), ', [',
-                    $f<columns>.list.map({ self.string(.Str) }).join(', '), "],\n",
+                    $f<columns>.list.join(', '), "],\n",
                     $!indent, self.table-string($t<table>), ', [',
-                    $t<columns>.list.map({ self.string(.Str) }).join(', '), "],\n",
+                    $t<columns>.list.join(', '), "],\n",
                     $!indent, self.fk-action-string($d), ",\n",
                     $!indent, self.fk-action-string($u), "\n",
                     ');',
             )
         );
     }
-    method drop-foreign-key(Match:D $s, Bool:D :$back = False --> Statement) {
+    method drop-foreign-key(Match:D $s, Bool:D :$back = False --> Yii2Statement) {
         my ($a, $f, $t) = $s<alias source target>;
         ($f, $t) = $t, $f if $back;
         my $index_name = self.index-name(S_FK, $a, $f, $t);
-        Statement.new(
+        Yii2Statement.new(
             :name("drop_$index_name"),
             :code(
                 [~] '$this->dropForeignKey(', "\n",
@@ -541,7 +558,7 @@ class Yii2Format does TransformFormat {
         );
     }
     method index-name(Str $prefix, $alias, *@table-col-refs --> Str) {
-        return $alias<name>.Str if $alias ~~ Match:D;
+        return self.name($alias<name>) if $alias ~~ Match:D;
         my @tables;
         my @columns;
         # $*ERR.say(@table-col-refs);
@@ -553,7 +570,6 @@ class Yii2Format does TransformFormat {
         for @tables {
             $_ = self.table($_);
         }
-        @columns».=Str;
         # $*ERR.say($(:@tables, :@columns).perl);
 
         my @refs = (@tables Z @columns).flat;
@@ -567,12 +583,12 @@ class Yii2Format does TransformFormat {
         die "too long index name in any case";
     }
 
-    method rename-table(Match:D $s, Bool:D :$back = False --> Statement) {
+    method rename-table(Match:D $s, Bool:D :$back = False --> Yii2Statement) {
         my ($from_table, $to_table) = $s<table rename_table>;
         $to_table = $to_table<table>;
         ($from_table, $to_table) = $to_table, $from_table if $back;
-        Statement.new(
-            :name("rename_{$from_table<name>}_{$to_table<name>}"),
+        Yii2Statement.new(
+            :name("rename_{self.table($from_table)}_{self.table($to_table)}"),
             :code(
                 [~] '$this->renameTable(',
                     self.table-string($from_table), ', ',
@@ -581,14 +597,14 @@ class Yii2Format does TransformFormat {
         );
     }
 
-    method alter-column-name(Match:D $s, Bool:D :$back = False --> Statement) {
+    method alter-column-name(Match:D $s, Bool:D :$back = False --> Yii2Statement) {
         my $table = $s<table>;
         my ($from_name, $to_name) = $s<alter_column><name alter_column_spec>;
-        $from_name .= Str;
-        $to_name = $to_name<alter_column_name><name>.Str;
+        $from_name = self.name($from_name);
+        $to_name = self.name($to_name<alter_column_name><name>);
         ($from_name, $to_name) = $to_name, $from_name if $back;
-        Statement.new(
-            :name("rename_{$table<name>}_{$from_name}_{$to_name}"),
+        Yii2Statement.new(
+            :name("rename_{self.table($table)}_{$from_name}_{$to_name}"),
             :code(
                 [~] '$this->renameColumn(',
                     self.table-string($table), ', ',
@@ -597,13 +613,13 @@ class Yii2Format does TransformFormat {
             )
         );
     }
-    method alter-column-type(Match:D $s, Bool:D :$back = False --> Statement) {
+    method alter-column-type(Match:D $s, Bool:D :$back = False --> Yii2Statement) {
         my $table = $s<table>;
         my ($name, $spec) = $s<alter_column><name alter_column_spec>;
-        $name .= Str;
+        $name = self.name($name);
         my $type = $spec{$back ?? 'from' !! 'to'};
-        Statement.new(
-            :name("alter_{$table<name>}_$name"),
+        Yii2Statement.new(
+            :name("alter_{self.table($table)}_$name"),
             :code(
                 [~] '$this->alterColumn(', "\n",
                     $!indent, self.table-string($table), ",\n",
@@ -614,8 +630,8 @@ class Yii2Format does TransformFormat {
         );
     }
 
-    method data-statement(Match:D $s, Bool:D :$back = False --> Statement) {
-        Statement.new(
+    method data-statement(Match:D $s, Bool:D :$back = False --> Yii2Statement) {
+        Yii2Statement.new(
             :name('update')
             :code(
                 [~] '// TODO: ',
@@ -631,12 +647,12 @@ class Yii2Format does TransformFormat {
         $type = self.column-type($type);
         return $type without $pos;
         return $type ~ '->first()' if $pos<pos_first>;
-        return $type ~ '->after(' ~ self.string($pos<name>.Str) ~ ')';
+        return $type ~ '->after(' ~ self.name-string($pos<name>) ~ ')';
     }
 
     method column-type(Match:D $t --> Str) {
         my ($name, $params, $null, $default) = $t<name params null_mark default_value>;
-        $name .= Str;
+        $name = self.name($name);
         $params = $params
             ?? $params<number>».Str.join(', ')
             !! '';
@@ -674,6 +690,10 @@ class Yii2Format does TransformFormat {
 
     method table-string(Match:D $t --> Str) {
         self.string('{{%' ~ self.table($t) ~ '}}');
+    }
+
+    method name-string(Match:D $n --> Str) {
+        self.string(self.name($n));
     }
 
     multi method fk-action-string(Match:D $on) {
