@@ -57,7 +57,7 @@ grammar MigrationSource {
     rule alter_column_type { <type> <position>? }
 
     token alias { '@' ~ <name> <?> }
-    rule table { '%' ~ <name> <?> }
+    token table { '%' ~ <name> <?> }
 
     rule alter_column_name { '=>' ~ <name> <?> }
     rule alter_column_spec {
