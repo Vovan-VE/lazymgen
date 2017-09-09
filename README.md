@@ -30,7 +30,7 @@ it will generate migrations.
 Usage
 -----
 
-Project requires [Perl 6][perl6] interpretter available in `$PATH`.
+Project requires [Perl 6][perl6] (6.c) interpretter available in `$PATH`.
 
 Input script will be read from input.
 
