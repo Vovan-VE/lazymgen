@@ -31,7 +31,7 @@ grammar MigrationSource {
     token value_keyword { :i <<[TRUE|FALSE|NULL]>> }
     token name {
         <!before <[ - \d ]> >
-        [ [ <[ _ a..z \d ]>+ | \\ . ]+ ]+ % '-'
+        [ [ <[ _ a..z \d ]>+ | \\ . ]+ ]+ % '-'+
     }
     token null_mark { '?' }
 
