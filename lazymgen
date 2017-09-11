@@ -365,8 +365,6 @@ class Yii2Migration is Migration {
 }
 
 class Yii2Format does TransformFormat {
-    has Str:D $.indent = '';
-
     my constant UNSIGNED         = '->unsigned()';
     my constant MAX_INDEX_LENGTH = 64;
 
@@ -416,7 +414,6 @@ class Yii2Format does TransformFormat {
             source => $s,
             up     => self.statement($s),
             down   => self.statement($s, :back),
-            indent => $!indent,
         );
     }
 
@@ -425,20 +422,20 @@ class Yii2Format does TransformFormat {
         Yii2Statement.new(
             :name("create_{self.table($table)}"),
             :code(
-                [~] '$tableOptions = null;', "\n",
-                    q[if ($this->db->driverName === 'mysql') {], "\n",
-                    $!indent, '// https://stackoverflow.com/q/766809', "\n",
-                    $!indent, q[$tableOptions = 'CHARACTER SET utf8 COLLATE utf8_unicode_ci ENGINE=InnoDB';], "\n",
-                    "}\n",
-                    "\n",
-                    '$this->createTable(', self.table-string($table), ", [\n",
-                    $!indent,
-                    $create<column_definition>.list.map({
-                        my ($name, $type) = .hash<name type>;
-                        [~] self.name-string($name), ' => ', self.column-type($type), ',';
-                    }).join("\n" ~ $!indent),
-                    "\n",
-                    '], $tableOptions);',
+                '$tableOptions = null;' ~ "\n" ~
+                q[if ($this->db->driverName === 'mysql') {] ~ "\n" ~
+                (
+                    '// https://stackoverflow.com/q/766809' ~ "\n" ~
+                    q[$tableOptions = 'CHARACTER SET utf8 COLLATE utf8_unicode_ci ENGINE=InnoDB';]
+                ).indent(4) ~ "\n" ~
+                "}\n" ~
+                "\n" ~
+                '$this->createTable(' ~ self.table-string($table) ~ ", [\n" ~
+                $create<column_definition>.list.map({
+                    my ($name, $type) = .hash<name type>;
+                    [~] self.name-string($name), ' => ', self.column-type($type), ',';
+                }).join("\n").indent(4) ~ "\n" ~
+                '], $tableOptions);'
             ),
         );
     }
@@ -446,7 +443,7 @@ class Yii2Format does TransformFormat {
         my ($table) = $s<table>;
         Yii2Statement.new(
             :name("drop_{self.table($table)}"),
-            :code([~] '$this->dropTable(', self.table-string($table), ');')
+            :code('$this->dropTable(' ~ self.table-string($table) ~ ');')
         );
     }
 
@@ -456,11 +453,13 @@ class Yii2Format does TransformFormat {
         Yii2Statement.new(
             :name("add_{self.table($table)}_{self.name($column)}"),
             :code(
-                [~] '$this->addColumn(', "\n",
-                    $!indent, self.table-string($table), ",\n",
-                    $!indent, self.name-string($column), ",\n",
-                    $!indent, self.column-type-pos($type_pos), "\n",
-                    ');',
+                '$this->addColumn(' ~ "\n" ~
+                (
+                    self.table-string($table) ~ ",\n" ~
+                    self.name-string($column) ~ ",\n" ~
+                    self.column-type-pos($type_pos)
+                ).indent(4) ~ "\n" ~
+                ');'
             )
         );
     }
@@ -470,9 +469,10 @@ class Yii2Format does TransformFormat {
         Yii2Statement.new(
             :name("drop_{self.table($table)}_{self.name($column)}"),
             :code(
-                [~] '$this->dropColumn(',
-                    self.table-string($table), ', ',
-                    self.string($column.Str), ');'
+                '$this->dropColumn(' ~
+                self.table-string($table) ~ ', ' ~
+                self.name-string($column) ~
+                ');'
             )
         );
     }
@@ -504,22 +504,23 @@ class Yii2Format does TransformFormat {
         Yii2Statement.new(
             :name($namePrefix ~ $index_name),
             :code(
-                [~] '$this->', $method, "(\n",
-                    $!indent, self.string($index_name), ",\n",
-                    $!indent, self.table-string($ref<table>),
-                    $cols
-                        ?? (
-                            ",\n",
-                            $!indent, '[',
-                            $ref<columns>.list.join(', '),
-                            ']'
-                        ).join('')
-                        !! '',
-                    $tag
-                        ?? (",\n", $!indent, $tag).join('')
-                        !! '',
-                    "\n",
-                    ');',
+                '$this->' ~ $method ~ "(\n" ~
+                (
+                    self.string($index_name) ~ ",\n" ~
+                    self.table-string($ref<table>) ~
+                    ($cols
+                        ?? ",\n[" ~
+                        $ref<columns>.list.map({
+                            self.name-string($_)
+                        }).join(', ') ~ ']'
+                        !! ''
+                    ) ~
+                    ($tag
+                        ?? ",\n$tag"
+                        !! ''
+                    )
+                ).indent(4) ~ "\n" ~
+                ');'
             )
         );
     }
@@ -531,15 +532,17 @@ class Yii2Format does TransformFormat {
         Yii2Statement.new(
             :name("add_$index_name"),
             :code(
-                [~] '$this->addForeignKey(', "\n",
-                    $!indent, self.string($index_name), ",\n",
-                    $!indent, self.table-string($f<table>), ', [',
-                    $f<columns>.list.join(', '), "],\n",
-                    $!indent, self.table-string($t<table>), ', [',
-                    $t<columns>.list.join(', '), "],\n",
-                    $!indent, self.fk-action-string($d), ",\n",
-                    $!indent, self.fk-action-string($u), "\n",
-                    ');',
+                '$this->addForeignKey(' ~ "\n" ~
+                (
+                    self.string($index_name) ~ ",\n" ~
+                    self.table-string($f<table>) ~ ', [' ~
+                    $f<columns>.list.map({ self.name-string($_) }).join(', ') ~ "],\n" ~
+                    self.table-string($t<table>) ~ ', [' ~
+                    $t<columns>.list.map({ self.name-string($_) }).join(', ') ~ "],\n" ~
+                    self.fk-action-string($d) ~ ",\n" ~
+                    self.fk-action-string($u)
+                ).indent(4) ~ "\n" ~
+                ');'
             )
         );
     }
@@ -550,10 +553,12 @@ class Yii2Format does TransformFormat {
         Yii2Statement.new(
             :name("drop_$index_name"),
             :code(
-                [~] '$this->dropForeignKey(', "\n",
-                    $!indent, self.string($index_name), ",\n",
-                    $!indent, self.table-string($f<table>), "\n",
-                    ');',
+                '$this->dropForeignKey(' ~ "\n" ~
+                (
+                    self.string($index_name) ~ ",\n" ~
+                    self.table-string($f<table>)
+                ).indent(4) ~ "\n" ~
+                ');'
             )
         );
     }
@@ -590,9 +595,9 @@ class Yii2Format does TransformFormat {
         Yii2Statement.new(
             :name("rename_{self.table($from_table)}_{self.table($to_table)}"),
             :code(
-                [~] '$this->renameTable(',
-                    self.table-string($from_table), ', ',
-                    self.table-string($to_table), ');',
+                '$this->renameTable(' ~
+                self.table-string($from_table) ~ ', ' ~
+                self.table-string($to_table) ~ ');'
             )
         );
     }
@@ -606,10 +611,10 @@ class Yii2Format does TransformFormat {
         Yii2Statement.new(
             :name("rename_{self.table($table)}_{$from_name}_{$to_name}"),
             :code(
-                [~] '$this->renameColumn(',
-                    self.table-string($table), ', ',
-                    self.string($from_name), ', ',
-                    self.string($to_name), ');',
+                '$this->renameColumn(' ~
+                self.table-string($table) ~ ', ' ~
+                self.string($from_name) ~ ', ' ~
+                self.string($to_name) ~ ');'
             )
         );
     }
@@ -621,11 +626,13 @@ class Yii2Format does TransformFormat {
         Yii2Statement.new(
             :name("alter_{self.table($table)}_$name"),
             :code(
-                [~] '$this->alterColumn(', "\n",
-                    $!indent, self.table-string($table), ",\n",
-                    $!indent, self.string($name), ",\n",
-                    $!indent, self.column-type-pos($type), "\n",
-                    ');',
+                '$this->alterColumn(' ~ "\n" ~
+                (
+                    self.table-string($table) ~ ",\n" ~
+                    self.string($name) ~ ",\n" ~
+                    self.column-type-pos($type)
+                ).indent(4) ~ "\n" ~
+                ');'
             )
         );
     }
@@ -634,10 +641,11 @@ class Yii2Format does TransformFormat {
         Yii2Statement.new(
             :name('update')
             :code(
-                [~] '// TODO: ',
-                    $back
-                        ?? 'undo that updates'
-                        !! 'add some updates',
+                '// TODO: ' ~
+                ($back
+                    ?? 'undo that updates'
+                    !! 'add some updates'
+                )
             ),
         );
     }
@@ -707,7 +715,8 @@ class Yii2Format does TransformFormat {
 }
 
 class Yii2Exporter does MigrationExporter {
-    has IO::Path:D $.path is required;
+    has IO::Path:D $.path   is required;
+    has Str:D      $.indent is required;
 
     has DateTime $!time;
 
@@ -745,7 +754,7 @@ class Yii2Exporter does MigrationExporter {
             "}\n";
 
         unless ' ' x 4 eq $migration.indent {
-            $code.=subst(/^^(' ' ** 4)+/, { $migration.indent x $0.elems }, :g);
+            $code.=subst(/^^(' ' ** 4)+/, { $!indent x $0.elems }, :g);
         }
 
         $filename.spurt($code, :createonly)
@@ -817,17 +826,15 @@ multi sub MAIN('yii2',
 
     transform(
         input    => $*IN,
-        format   => Yii2Format.new(:$indent),
-        exporter => Yii2Exporter.new(path => $path_io),
+        format   => Yii2Format.new,
+        exporter => Yii2Exporter.new(path => $path_io, :$indent),
     );
 }
 
-multi sub MAIN(
-    Str:D :$indent = DEFAULT_INDENT,
-) {
+multi sub MAIN() {
     transform(
         input    => $*IN,
-        format   => Yii2Format.new(:$indent),
+        format   => Yii2Format.new,
         exporter => DebugExporter.new,
     );
 }
