@@ -14,6 +14,8 @@ class X::App::Abort is X::AdHoc {
     multi method gist(X::App::Abort:D:) { $.payload }
 }
 
+my \IS_I = INIT { $*IN.t && $*OUT.t };
+
 sub abort(Str:D $message) {
     die X::App::Abort.new(payload => $message);
 }
@@ -665,7 +667,7 @@ class Yii2Format does TransformFormat {
             ?? $params<number>».Str.join(', ')
             !! '';
 
-        %types{$name}:exists or die "unknown type `$name`";
+        %types{$name}:exists or self.throw-unsupported("unknown type `$name`");
         my ($type, $appendix, $defined) = do given %types{$name} {
             when * === True { ($name,) }
             when Str:D { (.self,) }
@@ -765,31 +767,103 @@ class Yii2Exporter does MigrationExporter {
 }
 
 sub transform(IO::Handle :$input, TransformFormat :$format, MigrationExporter :$exporter) {
+    put "$PROJECT_NAME ver. $PROJECT_VER"   if IS_I;
+    put "Interactive mode"                  if IS_I;
+    print '> '                              if IS_I;
+
     my @migrations;
     my Int $line_number = 0;
+
+    # https://rt.perl.org/Public/Bug/Display.html?id=132076
+    # last/next inside CATCH does not work ever - neither anonymouse nor labeled
+    #
+    # `IO::Handle.lines` reads input lazily. Label for the loop
+    # could not be found - an exception cause some corruptions.
+    #
+    # So, here is `Bool $goto-next` to solve CATCH blocks.
     for $input.lines -> $line {
+        NEXT {
+            print '> '      if IS_I;
+        }
+        LAST {
+            put '(EOF)'     if IS_I;
+        }
+
         ++$line_number;
         next unless $line.trim;
         my $statement;
+        my $goto-next = False;
         try {
             $statement = MigrationSource.parse($line, rule => 'statement');
+
             CATCH {
                 when X::App::MatchFail {
-                    abort "syntax: $_ - at line $line_number";
+                    if IS_I {
+                        put "Syntax: $_";
+                        # next;
+                        $goto-next = True;
+                    }
+                    else {
+                        abort "syntax: $_ - at line $line_number";
+                    }
+                }
+                when X::App::Runtime {
+                    if IS_I {
+                        put "{.^name}: $_";
+                        # next;
+                        $goto-next = True;
+                    }
+                    else {
+                        abort "{.^name}: $_ - at line $line_number";
+                    }
                 }
             }
         }
-        $statement or abort "cannot match at line $line_number\n";
+        next if $goto-next;
+        unless $statement {
+            if IS_I {
+                put 'Syntax mismatch';
+                next;
+            }
+            abort "cannot match at line $line_number\n";
+        }
+
+        my $migration;
         try {
-            @migrations.push({
+            $migration = {
                 migration => $format.make-migration($statement),
                 line => $line_number,
-            });
+            };
+
             CATCH {
                 when X::App::Runtime {
-                    abort "{.^name}: $_ - at line $line_number";
+                    if IS_I {
+                        put "{.^name}: $_";
+                        # next;
+                        $goto-next = True;
+                    }
+                    else {
+                        abort "{.^name}: $_ - at line $line_number";
+                    }
                 }
             }
+        }
+        next if $goto-next;
+
+        if IS_I {
+            try {
+                $exporter.export($migration<migration>);
+                CATCH {
+                    when X::App::Runtime {
+                        put "{.^name}: $_";
+                        # next;
+                        # nothing to skip
+                    }
+                }
+            }
+        }
+        else {
+            @migrations.push($migration);
         }
     }
 

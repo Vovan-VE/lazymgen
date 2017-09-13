@@ -1,8 +1,6 @@
 TODO
 ====
 
-*   Improve interactive mode: show syntax error and continue.
-
 *   Add boolean flag for DML migrations.
 
 *   Refactor grammar in altering column type to remove parallel branches `=>`
