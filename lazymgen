@@ -191,17 +191,17 @@ class Migration {
     }
 
     multi method gist(Migration: --> Str) {
-        [~] '$> ', self.up.name, "\n",
-            |@!header.map({
-                "> $_".trim.indent(4) ~ "\n"
-            }),
-            |(UP => self.up, DOWN => self.down).map({
-                (
-                    .key ~ ":\n" ~
-                    .value.gist.indent(4)
-                ).indent(4) ~ "\n"
-            }),
-            '.';
+        '$> ' ~ self.up.name ~ "\n" ~
+        @!header.map({
+            "> $_".trim.indent(4) ~ "\n"
+        }).join ~
+        (UP => self.up, DOWN => self.down).map({
+            (
+                .key ~ ":\n" ~
+                .value.gist.indent(4)
+            ).indent(4) ~ "\n"
+        }).join ~
+        '.';
     }
 }
 
@@ -435,7 +435,7 @@ class Yii2Format does TransformFormat {
                 '$this->createTable(' ~ self.table-string($table) ~ ", [\n" ~
                 $create<column_definition>.list.map({
                     my ($name, $type) = .hash<name type>;
-                    [~] self.name-string($name), ' => ', self.column-type($type), ',';
+                    self.name-string($name) ~ ' => ' ~ self.column-type($type) ~ ',';
                 }).join("\n").indent(4) ~ "\n" ~
                 '], $tableOptions);'
             ),
@@ -678,7 +678,7 @@ class Yii2Format does TransformFormat {
             }
         };
 
-        my $ret = [~] '$this->', $type, '(', $params, ')';
+        my $ret = '$this->' ~ $type ~ '(' ~ $params ~ ')';
         if $defined {
             with $null {
                 self.throw-unsupported(
