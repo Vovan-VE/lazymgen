@@ -152,15 +152,16 @@ grammar MigrationSource {
 }
 
 class Statement {
-    has Str:D $.name = '';
-    has Str:D $.code = '';
+    has Str:D  $.name   = '';
+    has Str:D  $.code   = '';
+    has Bool:D $.is-dml = False;
 
     submethod TWEAK() {
         $!name = self.filter-name($!name);
     }
 
     multi method gist(Statement: --> Str) {
-        "`$!name` ⟨\n" ~
+        "`$!name` is-dml={$!is-dml} ⟨\n" ~
         $!code.indent(4) ~ "\n" ~
         "⟩";
     }
@@ -649,6 +650,7 @@ class Yii2Format does TransformFormat {
                     !! 'add some updates'
                 )
             ),
+            :is-dml,
         );
     }
 
@@ -761,7 +763,9 @@ class Yii2Exporter does MigrationExporter {
         $prefix.=subst(/   '/' <( '/'+ )> /, '', :g);
         $prefix.=subst(/   '/' $          /, '');
 
-        my Str:D $ns-class = $prefix ~ $migration.up.name.subst('-', '_', :g);
+        my ($up, $down, @header) = do with $migration { .up, .down, |.header };
+
+        my Str:D $ns-class = $prefix ~ $up.name.subst('-', '_', :g);
         my Str:D $class    = $ns-class.IO.basename;
 
         my IO::Path $filename = $!path.add($ns-class ~ ".php");
@@ -777,16 +781,18 @@ class Yii2Exporter does MigrationExporter {
         }
 
         my $body = '';
-        $body ~= "// $_".trim ~ "\n" for $migration.header;
-        $body ~= "\n" if $migration.header.elems;
+
+        $body ~= "// $_".trim ~ "\n"    for @header;
+        $body ~= "\n"                   if  @header.elems;
+
         $body ~=
-            "public function up()\n" ~
+            "public function {$up.is-dml ?? 'safeUp' !! 'up' }()\n" ~
             "\{\n" ~
-            $migration.up.code.indent(4) ~ "\n" ~
+            $up.code.indent(4) ~ "\n" ~
             "}\n\n" ~
-            "public function down()\n" ~
+            "public function {$down.is-dml ?? 'safeDown' !! 'down'}()\n" ~
             "\{\n" ~
-            $migration.down.code.indent(4) ~ "\n" ~
+            $down.code.indent(4) ~ "\n" ~
             '}';
 
         my $code = '<?php' ~ "\n\n" ~ 'use yii\db\Migration;' ~ "\n\n" ~
