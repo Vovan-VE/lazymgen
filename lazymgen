@@ -717,24 +717,64 @@ class Yii2Format does TransformFormat {
 }
 
 class Yii2Exporter does MigrationExporter {
-    has IO::Path:D $.path   is required;
-    has Str:D      $.indent is required;
+    has Str:D      $.indent       is required;
+    has IO::Path:D $.path         is required;
+    has Str:D      $.class-prefix = 'm%y%m%d_%H%M%S_';
+    has Int:D      $.dir-chmod    = 0o775;
 
     has DateTime $!time;
 
     submethod TWEAK() {
+        my %formats = (
+            '%' => ['%%'  , Nil],
+            Y   => ['%04d', { .year       }],
+            y   => ['%02d', { .year % 100 }],
+            'm' => ['%02d', { .month      }],
+            d   => ['%02d', { .day        }],
+            H   => ['%02d', { .hour       }],
+            M   => ['%02d', { .minute     }],
+            'S' => ['%02d', { .second     }],
+        );
+        my @params-getters;
+        my sub pass(Str:D $char) {
+            with %formats{$char} {
+                my ($placeholder, $getter) = @($_);
+                @params-getters.push($getter)   with $getter;
+                return $placeholder;
+            }
+            abort "unknown placholder `%{$char}`";
+        }
+        my Str $format = $!class-prefix.subst(/ '%' (.) /, { pass($0.Str) }, :g);
+
         $!time = DateTime.now(
             timezone  => 0,
             formatter => {
-                sprintf "%02d%02d%02d_%02d%02d%02d", .year % 100, .month, .day, .hour, .minute, .second;
+                sprintf $format, |@params-getters.map({ $^c(.self) });
             },
         );
     }
 
     method export(Yii2Migration:D $migration) {
-        my $class_name = 'm' ~ $!time.Str ~ '_' ~ $migration.up.name.subst('-', '_', :g);
-        my IO::Path $filename = $!path.add($class_name ~ ".php");
-        die "file already exists - `$filename`" if $filename.e;
+        my Str:D $prefix = $!time.Str;
+        $prefix.=subst(/ :i <-[ a..z \d / ]>+ /, '_', :g);
+        $prefix.=subst(/ ^ '/'            /, '');
+        $prefix.=subst(/   '/' <( '/'+ )> /, '', :g);
+        $prefix.=subst(/   '/' $          /, '');
+
+        my Str:D $ns-class = $prefix ~ $migration.up.name.subst('-', '_', :g);
+        my Str:D $class    = $ns-class.IO.basename;
+
+        my IO::Path $filename = $!path.add($ns-class ~ ".php");
+        abort "file already exists - `$filename`" if $filename.e;
+
+        given $filename.parent {
+            when .e {
+                .d or abort "path `{.self}` exists and is not a directory";
+            }
+            default {
+                .mkdir($!dir-chmod);
+            }
+        }
 
         my $body = '';
         $body ~= "// $_".trim ~ "\n" for $migration.header;
@@ -750,7 +790,7 @@ class Yii2Exporter does MigrationExporter {
             '}';
 
         my $code = '<?php' ~ "\n\n" ~ 'use yii\db\Migration;' ~ "\n\n" ~
-            "class $class_name extends Migration\n" ~
+            "class $class extends Migration\n" ~
             "\{\n" ~
             $body.indent(4) ~ "\n" ~
             "}\n";
@@ -881,16 +921,20 @@ sub transform(IO::Handle :$input, TransformFormat :$format, MigrationExporter :$
 
 my constant DEFAULT_INDENT = ' ' x 4;
 
-multi sub MAIN('yii2',
-    Str:D :$path   = './migrations',
-    Str:D :$indent = DEFAULT_INDENT,
-    Bool:D :$list-types = False,
-) {
-    if $list-types {
-        .put for Yii2Format.data-types.sort;
-        exit 0;
-    }
+my %*SUB-MAIN-OPTS = (
+    :named-anywhere,
+);
 
+multi sub MAIN('yii2', 'list-types') {
+    .put for Yii2Format.data-types.sort;
+}
+
+multi sub MAIN('yii2',
+    Str:D :$path         = './migrations',
+    Str:D :$indent       = DEFAULT_INDENT,
+    Str:D :$class-prefix = 'm%y%m%d_%H%M%S_',
+    Str:D :$dir-chmod    = '775',
+) {
     my $path_io = $path.IO;
     with $path_io {
         unless .e && .d {
@@ -901,7 +945,12 @@ multi sub MAIN('yii2',
     transform(
         input    => $*IN,
         format   => Yii2Format.new,
-        exporter => Yii2Exporter.new(path => $path_io, :$indent),
+        exporter => Yii2Exporter.new(
+            :path($path_io),
+            :$indent,
+            :$class-prefix,
+            :dir-chmod(:8($dir-chmod))
+        ),
     );
 }
 
@@ -911,4 +960,68 @@ multi sub MAIN() {
         format   => Yii2Format.new,
         exporter => DebugExporter.new,
     );
+}
+
+sub get-usage() {
+    Q:c:to/_END/;
+    Usage:
+        {$*PROGRAM-NAME}
+
+        {$*PROGRAM-NAME} yii2 [<options>]
+        {$*PROGRAM-NAME} yii2 list-types
+
+        {$*PROGRAM-NAME} man
+    _END
+}
+
+multi sub MAIN('man') {
+    print Q:c:to/_END/;
+    {$PROJECT_NAME} v{$PROJECT_VER}
+
+    {get-usage()}
+    Description
+        Generates migrations from short stupid weird script.
+
+        Without arguments reads source script from the input and writes result
+        in debug style to output. When both input and output are terminal then
+        interactive mode will be enabled.
+
+        `yii2` subset toggles Yii2 migrations to be generated into given directory.
+
+    Options
+
+        **yii2**
+
+        --class-prefix=<format>
+            Format to generate path and filename prefix for migrations under
+            the `--path` directory. Default format `m%y%m%d_%H%M%S_` will
+            produce classes names like so:
+
+                m170829_150305_create_user
+                m170829_150310_add_idx_user_mail
+                ...
+
+            Supported placeholders from `date(1)` are: %Y %y %m %d %H %M %S.
+
+            Format can contain `/` to create subdirectories.
+
+        --dir-chmod=<mode>
+            Permissions for subdirectories produced by `--class-prefix`
+            with `/` in format. Octal number. Default is `775`.
+
+        --indent=string
+            One level indention string. Will be used literally in generated
+            result. Default is four spaces.
+            To use TAB follow instructions for you shell. For example in Bash
+            you can use C-style string: $'\t' .
+
+        --path=<path>
+            Base path to store generated migrations. Path must to exist. Default
+            is `./migrations` .
+
+    _END
+}
+
+sub USAGE() {
+    print get-usage();
 }
