@@ -83,7 +83,7 @@ grammar MigrationSource {
     token fk_on_delete { '~' ~ <fk_verb> <?> }
     token fk_on_update { '*' ~ <fk_verb> <?> }
     rule fk_statement {
-        <<FK>> ~ [
+        [:i<<FK>>] ~ [
             <alias>? ~ [
                 <source=table_columns_ref> ~ [
                     '=>' ~ <target=table_columns_ref> <?>
@@ -96,7 +96,7 @@ grammar MigrationSource {
         ]?
     }
 
-    token index_type { << [I | U | PK] >> }
+    token index_type { :i << [I | U | PK] >> }
     rule key_statement {
         <index_type> ~ [
             <alias>? ~ <table_columns_ref> <?>
