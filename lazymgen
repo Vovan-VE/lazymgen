@@ -35,14 +35,15 @@ grammar MigrationSource {
         <!before <[ - \d ]> >
         [ [ <[ _ a..z \d ]>+ | \\ . ]+ ]+ % '-'+
     }
+    token value {
+        [<string> | <number>]
+        || <value_keyword>
+    }
     token null_mark { '?' }
 
-    rule default_value {
-        ['=' <!before '>'>] ~ [
-            [<number> | <string>]
-            || <value_keyword>
-        ] <?> }
-    rule params { '(' ~ ')' [ <number>* % ',' ] }
+    rule default_value { ['=' <!before '>'>] ~ <value> <?> }
+    rule numbers-list { <number>+ % ',' }
+    rule params { '(' ~ ')' <numbers-list>? }
     rule type {
         [':' ~ <name> <?>]
         <params>?
@@ -51,7 +52,8 @@ grammar MigrationSource {
     }
     rule column_definition { <name> ~ <type> <?> }
 
-    rule create_table_body { '(' ~ ')' [ <column_definition>* % ',' ] }
+    rule column-definition-list { <column_definition>* % ',' }
+    rule create_table_body { '(' ~ ')' <column-definition-list> }
 
     token pos_first { '^' }
     token pos_after { '>' }
@@ -64,7 +66,7 @@ grammar MigrationSource {
     rule alter_column_name { '=>' ~ <name> <?> }
     rule alter_column_spec {
         <alter_column_name>
-        | <from=alter_column_type> ~ [ '=>' ~ <to=alter_column_type> <?> ] <?>
+        | <from=.alter_column_type> ~ [ '=>' ~ <to=.alter_column_type> <?> ] <?>
     }
     rule alter_column { '.' ~ [<name> ~ <alter_column_spec> <?>] <?> }
     rule rename_table { '=>' ~ <table> <?> }
@@ -317,9 +319,10 @@ role TransformFormat {
         return self.name($t<name>);
     }
 
-    method default-value(Match:D $v --> Str) {
-        return $v<number>.Str           if $v<number>:exists;
-        return $v<value_keyword>.Str.lc if $v<value_keyword>:exists;
+    method default-value(Match:D $default --> Str) {
+        my $v = $default<value>;
+        return .Str         with $v<number>;
+        return .Str.lc      with $v<value_keyword>;
         return self.string(
             $v<string>.Str
                 .substr(1, *-1)
@@ -434,7 +437,7 @@ class Yii2Format does TransformFormat {
                 "}\n" ~
                 "\n" ~
                 '$this->createTable(' ~ self.table-string($table) ~ ", [\n" ~
-                $create<column_definition>.list.map({
+                $create<column-definition-list><column_definition>.list.map({
                     my ($name, $type) = .hash<name type>;
                     self.name-string($name) ~ ' => ' ~ self.column-type($type) ~ ',';
                 }).join("\n").indent(4) ~ "\n" ~
@@ -665,9 +668,12 @@ class Yii2Format does TransformFormat {
     method column-type(Match:D $t --> Str) {
         my ($name, $params, $null, $default) = $t<name params null_mark default_value>;
         $name = self.name($name);
-        $params = $params
-            ?? $params<number>».Str.join(', ')
-            !! '';
+        my $params-joined = '';
+        with $params {
+            with .hash<numbers-list> {
+                $params-joined = .hash<number>».Str.join(', ');
+            }
+        }
 
         %types{$name}:exists or self.throw-unsupported("unknown type `$name`");
         my ($type, $appendix, $defined) = do given %types{$name} {
@@ -680,7 +686,7 @@ class Yii2Format does TransformFormat {
             }
         };
 
-        my $ret = '$this->' ~ $type ~ '(' ~ $params ~ ')';
+        my $ret = '$this->' ~ $type ~ '(' ~ $params-joined ~ ')';
         if $defined {
             with $null {
                 self.throw-unsupported(
