@@ -773,8 +773,9 @@ class Yii2Exporter does MigrationExporter {
 
         my Str:D $ns-class = $prefix ~ $up.name.subst('-', '_', :g);
         my Str:D $class    = $ns-class.IO.basename;
+        my Str:D $rel-file = $ns-class ~ ".php";
 
-        my IO::Path $filename = $!path.add($ns-class ~ ".php");
+        my IO::Path $filename = $!path.add($rel-file);
         abort "file already exists - `$filename`" if $filename.e;
 
         given $filename.parent {
@@ -813,6 +814,7 @@ class Yii2Exporter does MigrationExporter {
 
         $filename.spurt($code, :createonly)
             or X::App::IO.new(pyload => "cannot create file - `$filename`");
+        put "* $rel-file";
 
         $!time.=later(:5second);
     }
