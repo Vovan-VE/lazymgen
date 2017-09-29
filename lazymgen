@@ -376,7 +376,7 @@ class Yii2Format does TransformFormat {
 
     my constant %types = {
         primary      => {:t<primaryKey>,    :D},
-        uprimary     => {:T<primaryKey>,    :D, :a(UNSIGNED)},
+        uprimary     => {:t<primaryKey>,    :D, :a(UNSIGNED)},
         primary-big  => {:t<bigPrimaryKey>, :D},
         uprimary-big => {:t<bigPrimaryKey>, :D, :a(UNSIGNED)},
         char         => True,
