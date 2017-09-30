@@ -124,6 +124,7 @@ grammar MigrationSource {
             <table> ~ [<rename_table> | <alter_column>] <?>
         ] <?>
     }
+    rule comment-line { '#' \N* }
 
     rule statement {
         ^^ ~ $$
@@ -132,6 +133,7 @@ grammar MigrationSource {
             | <drop_statement>
             | <alter_statement>
             | <data_statement>
+            | <comment-line>
         ]
     }
     rule TOP { <statement>* % [$ | \n] }
@@ -881,6 +883,8 @@ sub transform(IO::Handle :$input, TransformFormat :$format, MigrationExporter :$
             }
             abort "cannot match at line $line_number\n";
         }
+
+        next with $statement<comment-line>;
 
         my $migration;
         try {

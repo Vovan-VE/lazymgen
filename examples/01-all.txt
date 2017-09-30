@@ -1,3 +1,6 @@
+# header comment
+# comment lines
+  # more comments
 +%table-name (id:primary, state:bool()?, name:string(255), price:decimal(20,2), a:bool=TRUE, b:int(10)?=NULL, name:string(16)?='default \'string\\ value')
 -%table (name:string(64))
 +%table.foo:int(11)?=0
@@ -6,8 +9,10 @@
 +%table.foo:int(11) >bar
 -%table.foo:int(11) = +1.2e+3 >bar
 
+# another comment
 +%a\.b\\c.x\%y\(z--q:int
-
+# comment
+# comment2
 +PK %table.id
 +PK @pk-table %table.id
 -PK %table.id
