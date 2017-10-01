@@ -64,19 +64,19 @@ grammar MigrationSource {
     token table { '%' ~ <name> <?> }
 
     rule alter_column_name { '=>' ~ <name> <?> }
+    rule alter-column-to-type { '=>' ~ <alter_column_type> <?> }
     rule alter_column_spec {
         <alter_column_name>
-        | <from=.alter_column_type> ~ [ '=>' ~ <to=.alter_column_type> <?> ] <?>
+        | <alter_column_type> ~ <alter-column-to-type> <?>
     }
-    rule alter_column { '.' ~ [<name> ~ <alter_column_spec> <?>] <?> }
+    rule alter_column { <name> ~ <alter_column_spec> <?> }
     rule rename_table { '=>' ~ <table> <?> }
 
-    rule table_columns_ref {
-        <table>
-        ~
-        ['.' ~ <columns=name> ** 1 <?> | '(' ~ ')' [ <columns=name>+ % ',' ]]
-        <?>
+    rule columns-ref {
+        '.' ~ <columns=.name> ** 1 <?>
+        | '(' ~ ')' [ <columns=.name>+ % ',' ]
     }
+    rule table_columns_ref { <table> ~ <columns-ref> <?> }
 
     token fk_restrict { '!' }
     token fk_cascade { '>' }
@@ -84,14 +84,11 @@ grammar MigrationSource {
     token fk_verb { <fk_restrict> | <fk_cascade> | <fk_set_null> }
     token fk_on_delete { '~' ~ <fk_verb> <?> }
     token fk_on_update { '*' ~ <fk_verb> <?> }
+    rule fk-target { '=>' ~ <target=.table_columns_ref> <?> }
+    rule fk-map { <source=.table_columns_ref> ~ <fk-target> <?> }
+    rule fk-spec { <alias>? ~ <fk-map> <?> }
     rule fk_statement {
-        [:i<<FK>>] ~ [
-            <alias>? ~ [
-                <source=table_columns_ref> ~ [
-                    '=>' ~ <target=table_columns_ref> <?>
-                ] <?>
-            ] <?>
-        ] <?>
+        [:i<<FK>>] ~ <fk-spec> <?>
         [
             <fk_on_delete> <fk_on_update>?
             | <fk_on_update> <fk_on_delete>?
@@ -99,16 +96,13 @@ grammar MigrationSource {
     }
 
     token index_type { :i << [I | U | PK] >> }
-    rule key_statement {
-        <index_type> ~ [
-            <alias>? ~ <table_columns_ref> <?>
-        ] <?>
-    }
+    rule key-spec { <alias>? ~ <table_columns_ref> <?> }
+    rule key_statement { <index_type> ~ <key-spec> <?> }
 
-    rule add_column_body { '.' ~ [<name> ~ <alter_column_type> <?>] <?> }
-    rule table_ddl_statement {
-        <table> ~ [<create_table_body> | <add_column_body>] <?>
-    }
+    rule add-column-spec { <name> ~ <alter_column_type> <?> }
+    rule add_column_body { '.' ~ <add-column-spec> <?> }
+    rule table-ddl-spec { <create_table_body> | <add_column_body> }
+    rule table_ddl_statement { <table> ~ <table-ddl-spec> <?> }
 
     rule ddl_statement {
         <table_ddl_statement>
@@ -119,10 +113,13 @@ grammar MigrationSource {
     rule create_statement { '+' ~ <ddl_statement> <?> }
     rule drop_statement { '-' ~ <ddl_statement> <?> }
     rule data_statement { '=' }
+    rule alter_statement_spec {
+        <rename_table>
+        | '.' ~ <alter_column> <?>
+    }
+    rule alter_statement_body { <table> ~ <alter_statement_spec> <?> }
     rule alter_statement {
-        '*' ~ [
-            <table> ~ [<rename_table> | <alter_column>] <?>
-        ] <?>
+        '*' ~ <alter_statement_body> <?>
     }
     rule comment-line { '#' \N* }
 
@@ -258,11 +255,12 @@ role TransformFormat {
                 self.ddl-statement(.value<ddl_statement>, back => !$back);
             }
             when .key eq 'alter_statement' {
-                my $st = .value;
-                if $st<rename_table>:exists {
+                my $st   = .value<alter_statement_body>;
+                my $spec = $st<alter_statement_spec>;
+                if $spec<rename_table>:exists {
                     return self.rename-table($st, :$back);
                 }
-                my $alt = $st<alter_column><alter_column_spec>;
+                my $alt = $spec<alter_column><alter_column_spec>;
                 if $alt<alter_column_name>:exists {
                     return self.alter-column-name($st, :$back);
                 }
@@ -280,7 +278,7 @@ role TransformFormat {
     method ddl-statement(Match:D $s, Bool:D :$back = False --> Statement) {
         given $s.caps[0] {
             when .key eq 'table_ddl_statement' {
-                if .value<create_table_body>:exists {
+                if .value<table-ddl-spec><create_table_body>:exists {
                     return self.create-table(.value) unless $back;
                     return self.drop-table(.value);
                 }
@@ -288,19 +286,19 @@ role TransformFormat {
                 return self.drop-column(.value);
             }
             when .key eq 'key_statement' {
-                my $st = .value;
-                given $st<index_type>.Str.uc {
+                my ($type, $spec) = .value<index_type key-spec>;
+                given $type.Str.uc {
                     when 'PK' {
-                        return self.add-primary-key($st) unless $back;
-                        return self.drop-primary-key($st);
+                        return self.add-primary-key($spec) unless $back;
+                        return self.drop-primary-key($spec);
                     }
                     when 'U' {
-                        return self.add-unique-key($st) unless $back;
-                        return self.drop-unique-key($st);
+                        return self.add-unique-key($spec) unless $back;
+                        return self.drop-unique-key($spec);
                     }
                     when 'I' {
-                        return self.add-index($st) unless $back;
-                        return self.drop-index($st);
+                        return self.add-index($spec) unless $back;
+                        return self.drop-index($spec);
                     }
                     default {
                         die "unexpected index type `$_`";
@@ -426,7 +424,8 @@ class Yii2Format does TransformFormat {
     }
 
     method create-table(Match:D $s --> Yii2Statement) {
-        my ($table, $create) = $s<table create_table_body>;
+        my ($table, $create) = $s<table table-ddl-spec>;
+        $create = $create<create_table_body>;
         Yii2Statement.new(
             :name("create_{self.table($table)}"),
             :code(
@@ -456,7 +455,8 @@ class Yii2Format does TransformFormat {
     }
 
     method add-column(Match:D $s --> Yii2Statement) {
-        my ($table, $add_col) = $s<table add_column_body>;
+        my ($table, $add_col) = $s<table table-ddl-spec>;
+        $add_col = $add_col<add_column_body><add-column-spec>;
         my ($column, $type_pos) = $add_col<name alter_column_type>;
         Yii2Statement.new(
             :name("add_{self.table($table)}_{self.name($column)}"),
@@ -472,7 +472,8 @@ class Yii2Format does TransformFormat {
         );
     }
     method drop-column(Match:D $s --> Yii2Statement) {
-        my ($table, $add_col) = $s<table add_column_body>;
+        my ($table, $add_col) = $s<table table-ddl-spec>;
+        $add_col = $add_col<add_column_body><add-column-spec>;
         my ($column) = $add_col<name>;
         Yii2Statement.new(
             :name("drop_{self.table($table)}_{self.name($column)}"),
@@ -518,7 +519,7 @@ class Yii2Format does TransformFormat {
                     self.table-string($ref<table>) ~
                     ($cols
                         ?? ",\n[" ~
-                        $ref<columns>.list.map({
+                        $ref<columns-ref><columns>.list.map({
                             self.name-string($_)
                         }).join(', ') ~ ']'
                         !! ''
@@ -534,7 +535,10 @@ class Yii2Format does TransformFormat {
     }
 
     method add-foreigh-key(Match:D $s, Bool:D :$back = False --> Yii2Statement) {
-        my ($a, $f, $t, $d, $u) = $s<alias source target fk_on_delete fk_on_update>;
+        my ($spec, $d, $u) = $s<fk-spec fk_on_delete fk_on_update>;
+        my ($a, $map) = $spec<alias fk-map>;
+        my ($f, $t) = $map<source fk-target>;
+        $t = $t<target>;
         ($f, $t) = $t, $f if $back;
         my $index_name = self.index-name(S_FK, $a, $f, $t);
         Yii2Statement.new(
@@ -544,9 +548,11 @@ class Yii2Format does TransformFormat {
                 (
                     self.string($index_name) ~ ",\n" ~
                     self.table-string($f<table>) ~ ', [' ~
-                    $f<columns>.list.map({ self.name-string($_) }).join(', ') ~ "],\n" ~
+                    $f<columns-ref><columns>.list.map({ self.name-string($_) }).join(', ') ~
+                    "],\n" ~
                     self.table-string($t<table>) ~ ', [' ~
-                    $t<columns>.list.map({ self.name-string($_) }).join(', ') ~ "],\n" ~
+                    $t<columns-ref><columns>.list.map({ self.name-string($_) }).join(', ') ~
+                    "],\n" ~
                     self.fk-action-string($d) ~ ",\n" ~
                     self.fk-action-string($u)
                 ).indent(4) ~ "\n" ~
@@ -555,7 +561,9 @@ class Yii2Format does TransformFormat {
         );
     }
     method drop-foreign-key(Match:D $s, Bool:D :$back = False --> Yii2Statement) {
-        my ($a, $f, $t) = $s<alias source target>;
+        my ($a, $map) = $s<fk-spec><alias fk-map>;
+        my ($f, $t) = $map<source fk-target>;
+        $t = $t<target>;
         ($f, $t) = $t, $f if $back;
         my $index_name = self.index-name(S_FK, $a, $f, $t);
         Yii2Statement.new(
@@ -577,7 +585,7 @@ class Yii2Format does TransformFormat {
         # $*ERR.say(@table-col-refs);
         for @table-col-refs {
             # $*ERR.say($(:TABLE($_<table>), :COLUMNS($_<columns>)));
-            push |.list for @tables, @columns Z $_<table>, $_<columns>;
+            push |.list for @tables, @columns Z $_<table>, $_<columns-ref><columns>;
         }
         # $*ERR.say($(:@tables, :@columns));
         for @tables {
@@ -597,8 +605,8 @@ class Yii2Format does TransformFormat {
     }
 
     method rename-table(Match:D $s, Bool:D :$back = False --> Yii2Statement) {
-        my ($from_table, $to_table) = $s<table rename_table>;
-        $to_table = $to_table<table>;
+        my ($from_table, $to_table) = $s<table alter_statement_spec>;
+        $to_table = $to_table<rename_table><table>;
         ($from_table, $to_table) = $to_table, $from_table if $back;
         Yii2Statement.new(
             :name("rename_{self.table($from_table)}_{self.table($to_table)}"),
@@ -612,7 +620,7 @@ class Yii2Format does TransformFormat {
 
     method alter-column-name(Match:D $s, Bool:D :$back = False --> Yii2Statement) {
         my $table = $s<table>;
-        my ($from_name, $to_name) = $s<alter_column><name alter_column_spec>;
+        my ($from_name, $to_name) = $s<alter_statement_spec><alter_column><name alter_column_spec>;
         $from_name = self.name($from_name);
         $to_name = self.name($to_name<alter_column_name><name>);
         ($from_name, $to_name) = $to_name, $from_name if $back;
@@ -628,9 +636,11 @@ class Yii2Format does TransformFormat {
     }
     method alter-column-type(Match:D $s, Bool:D :$back = False --> Yii2Statement) {
         my $table = $s<table>;
-        my ($name, $spec) = $s<alter_column><name alter_column_spec>;
+        my ($name, $spec) = $s<alter_statement_spec><alter_column><name alter_column_spec>;
         $name = self.name($name);
-        my $type = $spec{$back ?? 'from' !! 'to'};
+        my $type = $back
+            ?? $spec<alter_column_type>
+            !! $spec<alter-column-to-type><alter_column_type>;
         Yii2Statement.new(
             :name("alter_{self.table($table)}_$name"),
             :code(
@@ -850,7 +860,7 @@ sub transform(IO::Handle :$input, TransformFormat :$format, MigrationExporter :$
         my $statement;
         my $goto-next = False;
         try {
-            $statement = MigrationSource.parse($line, rule => 'statement');
+            $statement = MigrationSource.parse($line, :rule<statement>);
 
             CATCH {
                 when X::App::MatchFail {

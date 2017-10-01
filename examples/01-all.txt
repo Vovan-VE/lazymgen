@@ -18,12 +18,12 @@
 -PK %table.id
 +U %table.name
 +U %table(name)
-+U @idx-table-name %table.name
++U @idx-table-uniq %table.name
 -U %table.name
 +I %table.foo
 +I %table(foo,bar)
-+I @idx-table-foo-bar %table(foo,bar)
-+I @idx-table-foo-bar %table(foo,bar)
++I @idx-table-foobar %table(foo,bar)
+-I @idx-table-foobar %table(foo,bar)
 -I %table(foo,bar)
 
 +FK %child.parent_id => %parent.id ~! *!
