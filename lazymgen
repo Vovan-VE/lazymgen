@@ -801,7 +801,7 @@ class Yii2Exporter does MigrationExporter {
 
         my $body = '';
 
-        $body ~= "// $_".trim ~ "\n"    for @header;
+        $body ~= "// $_".trim ~ "\n"    for @header.map({ .subst(/<?after '?'><?before '>'>/, '[⋯]', :g) });
         $body ~= "\n"                   if  @header.elems;
 
         $body ~=

@@ -8,6 +8,7 @@
 +%table.foo:int(11) ^
 +%table.foo:int(11) >bar
 -%table.foo:int(11) = +1.2e+3 >bar
++%table.foo:int?>bar
 
 # another comment
 +%a\.b\\c.x\%y\(z--q:int
