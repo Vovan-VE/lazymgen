@@ -1,0 +1,3 @@
+[submodule "tests/iotester"]
+	path = tests/iotester
+	url = https://github.com/Vovan-VE/iotester.git
