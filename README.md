@@ -70,6 +70,23 @@ Examples
 See [examples](./examples/).
 
 
+Testing
+-------
+
+To run tests first [IO Tester][] is required. Just run it in project directory.
+
+```sh
+$ iotester
+```
+
+If IO Tester is not available in $PATH, use one from Git submodule:
+
+```sh
+$ git submodule update --init
+$ tests/iotester/bin/iotester
+```
+
+
 License
 -------
 
@@ -78,3 +95,4 @@ This project is under [MIT License][mit].
 
 [mit]: https://opensource.org/licenses/MIT
 [perl6]: https://perl6.org/
+[IO Tester]: https://github.com/Vovan-VE/iotester
