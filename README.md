@@ -1,6 +1,8 @@
 Lazy Migration Generator
 ========================
 
+[![Build status](https://travis-ci.org/Vovan-VE/lazymgen.svg)](https://travis-ci.org/Vovan-VE/lazymgen)
+
 Generate lots of migrations scripts just with a single stupid weird script.
 
 What is this for?
