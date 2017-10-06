@@ -1,0 +1,3 @@
+docs/*          linguist-documentation
+vendor/*        linguist-vendored
+*.t             linguist-language=Text
