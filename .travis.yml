@@ -10,4 +10,4 @@ branches:
     - master
 
 script:
-  - tests/iotester/bin/iotester -p
+  - vendor/iotester/bin/iotester -p
