@@ -1,8 +1,10 @@
 TODO
 ====
 
+*   Refactor to use grammar actions and `:sym<...>`.
+
 *   Make syntax error messages more readable.
 
-*   Add namespace control to Yii2 exporter on future Yii versions.
+*   Tests for broken syntax.
 
-*   Refactor to use grammar actions and `:sym<...>`.
+*   Add namespace control to Yii2 exporter on future Yii versions.
