@@ -37,7 +37,7 @@ Input code | Description
 ---------- | -----------
 `+` | CREATE
 `%table-name` | Table `table-name`
-`(` ... `)` | Wrap columns definition, separated by comma
+`(` ... `)` | Columns definitions list, separated by comma
 
 Column definition:
 
@@ -47,7 +47,9 @@ Input code | Description
 `: data-type` | Data type. Exact data types depends on format
 `(42,37)` | Optional. Type parameters. Empty paranses are allowed too.
 `?` | Optional. NULL-able sign. Absens means `NOT NULL`.
-`= 'default'` | Optional. Default value. Value can be number (`42`, `+1.2`, `1e3`, `-1.2e-3`), string (`'foo\'bar\\lol'`), `TRUE`, `FALSE` or `NULL`.
+`= 'default'` | Optional. Default value.
+
+Default value can be either number (`42`, `+1.2`, `1e3`, `-1.2e-3`), string (`''`, `'foo\'bar\\lol'`), `TRUE`, `FALSE` or `NULL`.
 
 #### DROP TABLE
 
@@ -105,7 +107,10 @@ You already seen almost everything above. New here is:
 
 Input code | Description
 ---------- | -----------
-`@key-name` | Optional. Name for the key. By default it will be generated from table and column(s) names like `pk-table-column1-column2`.
+`@key-name` | Optional. Name for the key.
+
+When `@key-name` is omited it will be generated from table and column(s) names
+like `pk-table-column1-column2`.
 
 #### DROP PRIMARY KEY
 
@@ -174,7 +179,7 @@ Mostly everithing is familar for you. New here are:
 
 Input code | Description
 ---------- | -----------
-`=>` | Separate child table and columns from parent table and columns
+`=>` | Separate child and parent tables and columns
 `~!` | Optional. ON DELETE RESTRICT
 `~>` | Optional. ON DELETE CASCADE
 `~?` | Optional. ON DELETE SET NULL
@@ -186,8 +191,7 @@ _Note:_ Single column syntax `. column` and `( column )` means the same thing
 and does not require to be the same style on the both sides of `=>`.
 
 _Note:_ ON DELETE and ON UPDATE both are optional independently and can appear
-in any order. In case of absens it means absens in migration too (which means
-defaults in a next level for which migrations are).
+in any order. In case of absens it means RESTRICT.
 
 #### DROP FOREIGN KEY
 

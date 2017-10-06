@@ -1,24 +1,30 @@
-+%table-name (id:primary, name:string(255), state:bool()?, a:bool=TRUE, b:int(10)?=NULL, name:string(16)?='default \'string\\ value')
+# header comment
+# comment lines
+  # more comments
++%table-name (id:primary, state:bool()?, name:string(255), price:decimal(20,2), a:bool=TRUE, b:int(10)?=NULL, name:string(16)?='default \'string\\ value')
 -%table (name:string(64))
 +%table.foo:int(11)?=0
 +%table.foo:int(11) = -12.34e5
 +%table.foo:int(11) ^
 +%table.foo:int(11) >bar
 -%table.foo:int(11) = +1.2e+3 >bar
++%table.foo:int?>bar
 
+# another comment
 +%a\.b\\c.x\%y\(z--q:int
-
+# comment
+# comment2
 +PK %table.id
 +PK @pk-table %table.id
 -PK %table.id
 +U %table.name
 +U %table(name)
-+U @idx-table-name %table.name
++U @idx-table-uniq %table.name
 -U %table.name
 +I %table.foo
 +I %table(foo,bar)
-+I @idx-table-foo-bar %table(foo,bar)
-+I @idx-table-foo-bar %table(foo,bar)
++I @idx-table-foobar %table(foo,bar)
+-I @idx-table-foobar %table(foo,bar)
 -I %table(foo,bar)
 
 +FK %child.parent_id => %parent.id ~! *!

@@ -3,7 +3,7 @@
 use v6.c;
 
 my constant $PROJECT_NAME = 'Lazy Migration Generator';
-my constant $PROJECT_VER  = '0.0.1';
+my constant $PROJECT_VER  = '0.0.2';
 
 class X::App::MatchFail is X::AdHoc {}
 class X::App::Runtime is X::AdHoc {}
@@ -13,6 +13,8 @@ class X::App::IO is X::App::Runtime {}
 class X::App::Abort is X::AdHoc {
     multi method gist(X::App::Abort:D:) { $.payload }
 }
+
+my \IS_I = INIT { $*IN.t && $*OUT.t };
 
 sub abort(Str:D $message) {
     die X::App::Abort.new(payload => $message);
@@ -33,14 +35,15 @@ grammar MigrationSource {
         <!before <[ - \d ]> >
         [ [ <[ _ a..z \d ]>+ | \\ . ]+ ]+ % '-'+
     }
+    token value {
+        [<string> | <number>]
+        || <value_keyword>
+    }
     token null_mark { '?' }
 
-    rule default_value {
-        ['=' <!before '>'>] ~ [
-            [<number> | <string>]
-            || <value_keyword>
-        ] <?> }
-    rule params { '(' ~ ')' [ <number>* % ',' ] }
+    rule default_value { ['=' <!before '>'>] ~ <value> <?> }
+    rule numbers-list { [<number> ]+ % [',' ] }
+    rule params { '(' ~ ')' <numbers-list>? }
     rule type {
         [':' ~ <name> <?>]
         <params>?
@@ -49,7 +52,8 @@ grammar MigrationSource {
     }
     rule column_definition { <name> ~ <type> <?> }
 
-    rule create_table_body { '(' ~ ')' [ <column_definition>* % ',' ] }
+    rule column-definition-list { [<column_definition> ]+ % [',' ] }
+    rule create_table_body { '(' ~ ')' <column-definition-list> }
 
     token pos_first { '^' }
     token pos_after { '>' }
@@ -60,19 +64,19 @@ grammar MigrationSource {
     token table { '%' ~ <name> <?> }
 
     rule alter_column_name { '=>' ~ <name> <?> }
+    rule alter-column-to-type { '=>' ~ <alter_column_type> <?> }
     rule alter_column_spec {
         <alter_column_name>
-        | <from=alter_column_type> ~ [ '=>' ~ <to=alter_column_type> <?> ] <?>
+        | <alter_column_type> ~ <alter-column-to-type> <?>
     }
-    rule alter_column { '.' ~ [<name> ~ <alter_column_spec> <?>] <?> }
+    rule alter_column { <name> ~ <alter_column_spec> <?> }
     rule rename_table { '=>' ~ <table> <?> }
 
-    rule table_columns_ref {
-        <table>
-        ~
-        ['.' ~ <columns=name> ** 1 <?> | '(' ~ ')' [ <columns=name>+ % ',' ]]
-        <?>
+    rule columns-ref {
+        '.' ~ <columns=.name> ** 1 <?>
+        | '(' ~ ')' [[<columns=.name> ]+ % [',' ] ]
     }
+    rule table_columns_ref { <table> ~ <columns-ref> <?> }
 
     token fk_restrict { '!' }
     token fk_cascade { '>' }
@@ -80,31 +84,25 @@ grammar MigrationSource {
     token fk_verb { <fk_restrict> | <fk_cascade> | <fk_set_null> }
     token fk_on_delete { '~' ~ <fk_verb> <?> }
     token fk_on_update { '*' ~ <fk_verb> <?> }
+    rule fk-target { '=>' ~ <target=.table_columns_ref> <?> }
+    rule fk-map { <source=.table_columns_ref> ~ <fk-target> <?> }
+    rule fk-spec { <alias>? ~ <fk-map> <?> }
     rule fk_statement {
-        <<FK>> ~ [
-            <alias>? ~ [
-                <source=table_columns_ref> ~ [
-                    '=>' ~ <target=table_columns_ref> <?>
-                ] <?>
-            ] <?>
-        ] <?>
+        [:i<<FK>>] ~ <fk-spec> <?>
         [
             <fk_on_delete> <fk_on_update>?
             | <fk_on_update> <fk_on_delete>?
         ]?
     }
 
-    token index_type { << [I | U | PK] >> }
-    rule key_statement {
-        <index_type> ~ [
-            <alias>? ~ <table_columns_ref> <?>
-        ] <?>
-    }
+    token index_type { :i << [I | U | PK] >> }
+    rule key-spec { <alias>? ~ <table_columns_ref> <?> }
+    rule key_statement { <index_type> ~ <key-spec> <?> }
 
-    rule add_column_body { '.' ~ [<name> ~ <alter_column_type> <?>] <?> }
-    rule table_ddl_statement {
-        <table> ~ [<create_table_body> | <add_column_body>] <?>
-    }
+    rule add-column-spec { <name> ~ <alter_column_type> <?> }
+    rule add_column_body { '.' ~ <add-column-spec> <?> }
+    rule table-ddl-spec { <create_table_body> | <add_column_body> }
+    rule table_ddl_statement { <table> ~ <table-ddl-spec> <?> }
 
     rule ddl_statement {
         <table_ddl_statement>
@@ -115,11 +113,15 @@ grammar MigrationSource {
     rule create_statement { '+' ~ <ddl_statement> <?> }
     rule drop_statement { '-' ~ <ddl_statement> <?> }
     rule data_statement { '=' }
-    rule alter_statement {
-        '*' ~ [
-            <table> ~ [<rename_table> | <alter_column>] <?>
-        ] <?>
+    rule alter_statement_spec {
+        <rename_table>
+        | '.' ~ <alter_column> <?>
     }
+    rule alter_statement_body { <table> ~ <alter_statement_spec> <?> }
+    rule alter_statement {
+        '*' ~ <alter_statement_body> <?>
+    }
+    rule comment-line { '#' \N* }
 
     rule statement {
         ^^ ~ $$
@@ -128,6 +130,7 @@ grammar MigrationSource {
             | <drop_statement>
             | <alter_statement>
             | <data_statement>
+            | <comment-line>
         ]
     }
     rule TOP { <statement>* % [$ | \n] }
@@ -150,15 +153,16 @@ grammar MigrationSource {
 }
 
 class Statement {
-    has Str:D $.name = '';
-    has Str:D $.code = '';
+    has Str:D  $.name   = '';
+    has Str:D  $.code   = '';
+    has Bool:D $.is-dml = False;
 
     submethod TWEAK() {
         $!name = self.filter-name($!name);
     }
 
     multi method gist(Statement: --> Str) {
-        "`$!name` ⟨\n" ~
+        "`$!name` is-dml={$!is-dml} ⟨\n" ~
         $!code.indent(4) ~ "\n" ~
         "⟩";
     }
@@ -174,7 +178,7 @@ class Migration {
 
     method BUILDALL(|) {
         @!header.unshift(
-            "Generated with $PROJECT_NAME/$PROJECT_VER",
+            "Generated with $PROJECT_NAME",
         );
 
         callsame;
@@ -182,24 +186,24 @@ class Migration {
         @!header.push(
             "",
             "Source:",
-            "    $!source",
+            "    {$!source.trim}",
         );
 
         self;
     }
 
     multi method gist(Migration: --> Str) {
-        [~] '$> ', self.up.name, "\n",
-            |@!header.map({
-                "> $_".trim.indent(4) ~ "\n"
-            }),
-            |(UP => self.up, DOWN => self.down).map({
-                (
-                    .key ~ ":\n" ~
-                    .value.gist.indent(4)
-                ).indent(4) ~ "\n"
-            }),
-            '.';
+        '$> ' ~ self.up.name ~ "\n" ~
+        @!header.map({
+            "> $_".trim.indent(4) ~ "\n"
+        }).join ~
+        (UP => self.up, DOWN => self.down).map({
+            (
+                .key ~ ":\n" ~
+                .value.gist.indent(4)
+            ).indent(4) ~ "\n"
+        }).join ~
+        '.';
     }
 }
 
@@ -251,11 +255,12 @@ role TransformFormat {
                 self.ddl-statement(.value<ddl_statement>, back => !$back);
             }
             when .key eq 'alter_statement' {
-                my $st = .value;
-                if $st<rename_table>:exists {
+                my $st   = .value<alter_statement_body>;
+                my $spec = $st<alter_statement_spec>;
+                if $spec<rename_table>:exists {
                     return self.rename-table($st, :$back);
                 }
-                my $alt = $st<alter_column><alter_column_spec>;
+                my $alt = $spec<alter_column><alter_column_spec>;
                 if $alt<alter_column_name>:exists {
                     return self.alter-column-name($st, :$back);
                 }
@@ -273,7 +278,7 @@ role TransformFormat {
     method ddl-statement(Match:D $s, Bool:D :$back = False --> Statement) {
         given $s.caps[0] {
             when .key eq 'table_ddl_statement' {
-                if .value<create_table_body>:exists {
+                if .value<table-ddl-spec><create_table_body>:exists {
                     return self.create-table(.value) unless $back;
                     return self.drop-table(.value);
                 }
@@ -281,19 +286,19 @@ role TransformFormat {
                 return self.drop-column(.value);
             }
             when .key eq 'key_statement' {
-                my $st = .value;
-                given $st<index_type>.Str.uc {
+                my ($type, $spec) = .value<index_type key-spec>;
+                given $type.Str.uc {
                     when 'PK' {
-                        return self.add-primary-key($st) unless $back;
-                        return self.drop-primary-key($st);
+                        return self.add-primary-key($spec) unless $back;
+                        return self.drop-primary-key($spec);
                     }
                     when 'U' {
-                        return self.add-unique-key($st) unless $back;
-                        return self.drop-unique-key($st);
+                        return self.add-unique-key($spec) unless $back;
+                        return self.drop-unique-key($spec);
                     }
                     when 'I' {
-                        return self.add-index($st) unless $back;
-                        return self.drop-index($st);
+                        return self.add-index($spec) unless $back;
+                        return self.drop-index($spec);
                     }
                     default {
                         die "unexpected index type `$_`";
@@ -314,9 +319,10 @@ role TransformFormat {
         return self.name($t<name>);
     }
 
-    method default-value(Match:D $v --> Str) {
-        return $v<number>.Str           if $v<number>:exists;
-        return $v<value_keyword>.Str.lc if $v<value_keyword>:exists;
+    method default-value(Match:D $default --> Str) {
+        my $v = $default<value>;
+        return .Str         with $v<number>;
+        return .Str.lc      with $v<value_keyword>;
         return self.string(
             $v<string>.Str
                 .substr(1, *-1)
@@ -349,7 +355,10 @@ class DebugExporter does MigrationExporter {
 
 class Yii2Statement is Statement {
     method filter-name(Str:D $name --> Str:D) {
-        $name.subst(/ :i <-[ a..z \d ]>+ /, '_', :g);
+        $name
+            .subst(/ :i <-[ a..z \d ]>+ /, '_', :g)
+            .subst(/ ^ _+ || _+ $ /, '', :g)
+            || 'noname';
     }
 }
 
@@ -365,14 +374,12 @@ class Yii2Migration is Migration {
 }
 
 class Yii2Format does TransformFormat {
-    has Str:D $.indent = '';
-
     my constant UNSIGNED         = '->unsigned()';
     my constant MAX_INDEX_LENGTH = 64;
 
     my constant %types = {
         primary      => {:t<primaryKey>,    :D},
-        uprimary     => {:T<primaryKey>,    :D, :a(UNSIGNED)},
+        uprimary     => {:t<primaryKey>,    :D, :a(UNSIGNED)},
         primary-big  => {:t<bigPrimaryKey>, :D},
         uprimary-big => {:t<bigPrimaryKey>, :D, :a(UNSIGNED)},
         char         => True,
@@ -416,29 +423,29 @@ class Yii2Format does TransformFormat {
             source => $s,
             up     => self.statement($s),
             down   => self.statement($s, :back),
-            indent => $!indent,
         );
     }
 
     method create-table(Match:D $s --> Yii2Statement) {
-        my ($table, $create) = $s<table create_table_body>;
+        my ($table, $create) = $s<table table-ddl-spec>;
+        $create = $create<create_table_body>;
         Yii2Statement.new(
             :name("create_{self.table($table)}"),
             :code(
-                [~] '$tableOptions = null;', "\n",
-                    q[if ($this->db->driverName === 'mysql') {], "\n",
-                    $!indent, '// https://stackoverflow.com/q/766809', "\n",
-                    $!indent, q[$tableOptions = 'CHARACTER SET utf8 COLLATE utf8_unicode_ci ENGINE=InnoDB';], "\n",
-                    "}\n",
-                    "\n",
-                    '$this->createTable(', self.table-string($table), ", [\n",
-                    $!indent,
-                    $create<column_definition>.list.map({
-                        my ($name, $type) = .hash<name type>;
-                        [~] self.name-string($name), ' => ', self.column-type($type), ',';
-                    }).join("\n" ~ $!indent),
-                    "\n",
-                    '], $tableOptions);',
+                '$tableOptions = null;' ~ "\n" ~
+                q[if ($this->db->driverName === 'mysql') {] ~ "\n" ~
+                (
+                    '// https://stackoverflow.com/q/766809' ~ "\n" ~
+                    q[$tableOptions = 'CHARACTER SET utf8 COLLATE utf8_unicode_ci ENGINE=InnoDB';]
+                ).indent(4) ~ "\n" ~
+                "}\n" ~
+                "\n" ~
+                '$this->createTable(' ~ self.table-string($table) ~ ", [\n" ~
+                $create<column-definition-list><column_definition>.list.map({
+                    my ($name, $type) = .hash<name type>;
+                    self.name-string($name) ~ ' => ' ~ self.column-type($type) ~ ',';
+                }).join("\n").indent(4) ~ "\n" ~
+                '], $tableOptions);'
             ),
         );
     }
@@ -446,33 +453,38 @@ class Yii2Format does TransformFormat {
         my ($table) = $s<table>;
         Yii2Statement.new(
             :name("drop_{self.table($table)}"),
-            :code([~] '$this->dropTable(', self.table-string($table), ');')
+            :code('$this->dropTable(' ~ self.table-string($table) ~ ');')
         );
     }
 
     method add-column(Match:D $s --> Yii2Statement) {
-        my ($table, $add_col) = $s<table add_column_body>;
+        my ($table, $add_col) = $s<table table-ddl-spec>;
+        $add_col = $add_col<add_column_body><add-column-spec>;
         my ($column, $type_pos) = $add_col<name alter_column_type>;
         Yii2Statement.new(
             :name("add_{self.table($table)}_{self.name($column)}"),
             :code(
-                [~] '$this->addColumn(', "\n",
-                    $!indent, self.table-string($table), ",\n",
-                    $!indent, self.name-string($column), ",\n",
-                    $!indent, self.column-type-pos($type_pos), "\n",
-                    ');',
+                '$this->addColumn(' ~ "\n" ~
+                (
+                    self.table-string($table) ~ ",\n" ~
+                    self.name-string($column) ~ ",\n" ~
+                    self.column-type-pos($type_pos)
+                ).indent(4) ~ "\n" ~
+                ');'
             )
         );
     }
     method drop-column(Match:D $s --> Yii2Statement) {
-        my ($table, $add_col) = $s<table add_column_body>;
+        my ($table, $add_col) = $s<table table-ddl-spec>;
+        $add_col = $add_col<add_column_body><add-column-spec>;
         my ($column) = $add_col<name>;
         Yii2Statement.new(
             :name("drop_{self.table($table)}_{self.name($column)}"),
             :code(
-                [~] '$this->dropColumn(',
-                    self.table-string($table), ', ',
-                    self.string($column.Str), ');'
+                '$this->dropColumn(' ~
+                self.table-string($table) ~ ', ' ~
+                self.name-string($column) ~
+                ');'
             )
         );
     }
@@ -504,56 +516,68 @@ class Yii2Format does TransformFormat {
         Yii2Statement.new(
             :name($namePrefix ~ $index_name),
             :code(
-                [~] '$this->', $method, "(\n",
-                    $!indent, self.string($index_name), ",\n",
-                    $!indent, self.table-string($ref<table>),
-                    $cols
-                        ?? (
-                            ",\n",
-                            $!indent, '[',
-                            $ref<columns>.list.join(', '),
-                            ']'
-                        ).join('')
-                        !! '',
-                    $tag
-                        ?? (",\n", $!indent, $tag).join('')
-                        !! '',
-                    "\n",
-                    ');',
+                '$this->' ~ $method ~ "(\n" ~
+                (
+                    self.string($index_name) ~ ",\n" ~
+                    self.table-string($ref<table>) ~
+                    ($cols
+                        ?? ",\n[" ~
+                        $ref<columns-ref><columns>.list.map({
+                            self.name-string($_)
+                        }).join(', ') ~ ']'
+                        !! ''
+                    ) ~
+                    ($tag
+                        ?? ",\n$tag"
+                        !! ''
+                    )
+                ).indent(4) ~ "\n" ~
+                ');'
             )
         );
     }
 
     method add-foreigh-key(Match:D $s, Bool:D :$back = False --> Yii2Statement) {
-        my ($a, $f, $t, $d, $u) = $s<alias source target fk_on_delete fk_on_update>;
+        my ($spec, $d, $u) = $s<fk-spec fk_on_delete fk_on_update>;
+        my ($a, $map) = $spec<alias fk-map>;
+        my ($f, $t) = $map<source fk-target>;
+        $t = $t<target>;
         ($f, $t) = $t, $f if $back;
         my $index_name = self.index-name(S_FK, $a, $f, $t);
         Yii2Statement.new(
             :name("add_$index_name"),
             :code(
-                [~] '$this->addForeignKey(', "\n",
-                    $!indent, self.string($index_name), ",\n",
-                    $!indent, self.table-string($f<table>), ', [',
-                    $f<columns>.list.join(', '), "],\n",
-                    $!indent, self.table-string($t<table>), ', [',
-                    $t<columns>.list.join(', '), "],\n",
-                    $!indent, self.fk-action-string($d), ",\n",
-                    $!indent, self.fk-action-string($u), "\n",
-                    ');',
+                '$this->addForeignKey(' ~ "\n" ~
+                (
+                    self.string($index_name) ~ ",\n" ~
+                    self.table-string($f<table>) ~ ', [' ~
+                    $f<columns-ref><columns>.list.map({ self.name-string($_) }).join(', ') ~
+                    "],\n" ~
+                    self.table-string($t<table>) ~ ', [' ~
+                    $t<columns-ref><columns>.list.map({ self.name-string($_) }).join(', ') ~
+                    "],\n" ~
+                    self.fk-action-string($d) ~ ",\n" ~
+                    self.fk-action-string($u)
+                ).indent(4) ~ "\n" ~
+                ');'
             )
         );
     }
     method drop-foreign-key(Match:D $s, Bool:D :$back = False --> Yii2Statement) {
-        my ($a, $f, $t) = $s<alias source target>;
+        my ($a, $map) = $s<fk-spec><alias fk-map>;
+        my ($f, $t) = $map<source fk-target>;
+        $t = $t<target>;
         ($f, $t) = $t, $f if $back;
         my $index_name = self.index-name(S_FK, $a, $f, $t);
         Yii2Statement.new(
             :name("drop_$index_name"),
             :code(
-                [~] '$this->dropForeignKey(', "\n",
-                    $!indent, self.string($index_name), ",\n",
-                    $!indent, self.table-string($f<table>), "\n",
-                    ');',
+                '$this->dropForeignKey(' ~ "\n" ~
+                (
+                    self.string($index_name) ~ ",\n" ~
+                    self.table-string($f<table>)
+                ).indent(4) ~ "\n" ~
+                ');'
             )
         );
     }
@@ -561,16 +585,16 @@ class Yii2Format does TransformFormat {
         return self.name($alias<name>) if $alias ~~ Match:D;
         my @tables;
         my @columns;
-        # $*ERR.say(@table-col-refs);
+        # note @table-col-refs;
         for @table-col-refs {
             # $*ERR.say($(:TABLE($_<table>), :COLUMNS($_<columns>)));
-            push |.list for @tables, @columns Z $_<table>, $_<columns>;
+            push |.list for @tables, @columns Z $_<table>, $_<columns-ref><columns>.list.map({ self.name($_) }).cache;
         }
-        # $*ERR.say($(:@tables, :@columns));
+        # note $(:@tables, :@columns);
         for @tables {
             $_ = self.table($_);
         }
-        # $*ERR.say($(:@tables, :@columns).perl);
+        # note $(:@tables, :@columns).perl;
 
         my @refs = (@tables Z @columns).flat;
 
@@ -584,48 +608,52 @@ class Yii2Format does TransformFormat {
     }
 
     method rename-table(Match:D $s, Bool:D :$back = False --> Yii2Statement) {
-        my ($from_table, $to_table) = $s<table rename_table>;
-        $to_table = $to_table<table>;
+        my ($from_table, $to_table) = $s<table alter_statement_spec>;
+        $to_table = $to_table<rename_table><table>;
         ($from_table, $to_table) = $to_table, $from_table if $back;
         Yii2Statement.new(
             :name("rename_{self.table($from_table)}_{self.table($to_table)}"),
             :code(
-                [~] '$this->renameTable(',
-                    self.table-string($from_table), ', ',
-                    self.table-string($to_table), ');',
+                '$this->renameTable(' ~
+                self.table-string($from_table) ~ ', ' ~
+                self.table-string($to_table) ~ ');'
             )
         );
     }
 
     method alter-column-name(Match:D $s, Bool:D :$back = False --> Yii2Statement) {
         my $table = $s<table>;
-        my ($from_name, $to_name) = $s<alter_column><name alter_column_spec>;
+        my ($from_name, $to_name) = $s<alter_statement_spec><alter_column><name alter_column_spec>;
         $from_name = self.name($from_name);
         $to_name = self.name($to_name<alter_column_name><name>);
         ($from_name, $to_name) = $to_name, $from_name if $back;
         Yii2Statement.new(
             :name("rename_{self.table($table)}_{$from_name}_{$to_name}"),
             :code(
-                [~] '$this->renameColumn(',
-                    self.table-string($table), ', ',
-                    self.string($from_name), ', ',
-                    self.string($to_name), ');',
+                '$this->renameColumn(' ~
+                self.table-string($table) ~ ', ' ~
+                self.string($from_name) ~ ', ' ~
+                self.string($to_name) ~ ');'
             )
         );
     }
     method alter-column-type(Match:D $s, Bool:D :$back = False --> Yii2Statement) {
         my $table = $s<table>;
-        my ($name, $spec) = $s<alter_column><name alter_column_spec>;
+        my ($name, $spec) = $s<alter_statement_spec><alter_column><name alter_column_spec>;
         $name = self.name($name);
-        my $type = $spec{$back ?? 'from' !! 'to'};
+        my $type = $back
+            ?? $spec<alter_column_type>
+            !! $spec<alter-column-to-type><alter_column_type>;
         Yii2Statement.new(
             :name("alter_{self.table($table)}_$name"),
             :code(
-                [~] '$this->alterColumn(', "\n",
-                    $!indent, self.table-string($table), ",\n",
-                    $!indent, self.string($name), ",\n",
-                    $!indent, self.column-type-pos($type), "\n",
-                    ');',
+                '$this->alterColumn(' ~ "\n" ~
+                (
+                    self.table-string($table) ~ ",\n" ~
+                    self.string($name) ~ ",\n" ~
+                    self.column-type-pos($type)
+                ).indent(4) ~ "\n" ~
+                ');'
             )
         );
     }
@@ -634,11 +662,13 @@ class Yii2Format does TransformFormat {
         Yii2Statement.new(
             :name('update')
             :code(
-                [~] '// TODO: ',
-                    $back
-                        ?? 'undo that updates'
-                        !! 'add some updates',
+                '// TODO: ' ~
+                ($back
+                    ?? 'undo that updates'
+                    !! 'add some updates'
+                )
             ),
+            :is-dml,
         );
     }
 
@@ -653,11 +683,14 @@ class Yii2Format does TransformFormat {
     method column-type(Match:D $t --> Str) {
         my ($name, $params, $null, $default) = $t<name params null_mark default_value>;
         $name = self.name($name);
-        $params = $params
-            ?? $params<number>».Str.join(', ')
-            !! '';
+        my $params-joined = '';
+        with $params {
+            with .hash<numbers-list> {
+                $params-joined = .hash<number>».Str.join(', ');
+            }
+        }
 
-        %types{$name}:exists or die "unknown type `$name`";
+        %types{$name}:exists or self.throw-unsupported("unknown type `$name`");
         my ($type, $appendix, $defined) = do given %types{$name} {
             when * === True { ($name,) }
             when Str:D { (.self,) }
@@ -668,7 +701,7 @@ class Yii2Format does TransformFormat {
             }
         };
 
-        my $ret = [~] '$this->', $type, '(', $params, ')';
+        my $ret = '$this->' ~ $type ~ '(' ~ $params-joined ~ ')';
         if $defined {
             with $null {
                 self.throw-unsupported(
@@ -707,80 +740,201 @@ class Yii2Format does TransformFormat {
 }
 
 class Yii2Exporter does MigrationExporter {
-    has IO::Path:D $.path is required;
+    has Str:D      $.indent       is required;
+    has IO::Path:D $.path         is required;
+    has Str:D      $.class-prefix = 'm%y%m%d_%H%M%S_';
+    has Int:D      $.dir-chmod    = 0o775;
 
     has DateTime $!time;
 
     submethod TWEAK() {
+        my %formats = (
+            '%' => ['%%'  , Nil],
+            Y   => ['%04d', { .year       }],
+            y   => ['%02d', { .year % 100 }],
+            'm' => ['%02d', { .month      }],
+            d   => ['%02d', { .day        }],
+            H   => ['%02d', { .hour       }],
+            M   => ['%02d', { .minute     }],
+            'S' => ['%02d', { .second     }],
+        );
+        my @params-getters;
+        my sub pass(Str:D $char) {
+            with %formats{$char} {
+                my ($placeholder, $getter) = @($_);
+                @params-getters.push($getter)   with $getter;
+                return $placeholder;
+            }
+            abort "unknown placholder `%{$char}`";
+        }
+        my Str $format = $!class-prefix.subst(/ '%' (.) /, { pass($0.Str) }, :g);
+
         $!time = DateTime.now(
             timezone  => 0,
             formatter => {
-                sprintf "%02d%02d%02d_%02d%02d%02d", .year % 100, .month, .day, .hour, .minute, .second;
+                sprintf $format, |@params-getters.map({ $^c(.self) });
             },
         );
     }
 
     method export(Yii2Migration:D $migration) {
-        my $class_name = 'm' ~ $!time.Str ~ '_' ~ $migration.up.name.subst('-', '_', :g);
-        my IO::Path $filename = $!path.add($class_name ~ ".php");
-        die "file already exists - `$filename`" if $filename.e;
+        my Str:D $prefix = $!time.Str;
+        $prefix.=subst(/ :i <-[ a..z \d / ]>+ /, '_', :g);
+        $prefix.=subst(/ ^ '/'            /, '');
+        $prefix.=subst(/   '/' <( '/'+ )> /, '', :g);
+        $prefix.=subst(/   '/' $          /, '');
+
+        my ($up, $down, @header) = do with $migration { .up, .down, |.header };
+
+        my Str:D $ns-class = $prefix ~ $up.name.subst('-', '_', :g);
+        my Str:D $class    = $ns-class.IO.basename;
+        my Str:D $rel-file = $ns-class ~ ".php";
+
+        my IO::Path $filename = $!path.add($rel-file);
+        abort "file already exists - `$filename`" if $filename.e;
+
+        given $filename.parent {
+            when .e {
+                .d or abort "path `{.self}` exists and is not a directory";
+            }
+            default {
+                .mkdir($!dir-chmod);
+            }
+        }
 
         my $body = '';
-        $body ~= "// $_".trim ~ "\n" for $migration.header;
-        $body ~= "\n" if $migration.header.elems;
+
+        $body ~= "// $_".trim ~ "\n"    for @header.map({ .subst(/<?after '?'><?before '>'>/, '[⋯]', :g) });
+        $body ~= "\n"                   if  @header.elems;
+
         $body ~=
-            "public function up()\n" ~
+            "public function {$up.is-dml ?? 'safeUp' !! 'up' }()\n" ~
             "\{\n" ~
-            $migration.up.code.indent(4) ~ "\n" ~
+            $up.code.indent(4) ~ "\n" ~
             "}\n\n" ~
-            "public function down()\n" ~
+            "public function {$down.is-dml ?? 'safeDown' !! 'down'}()\n" ~
             "\{\n" ~
-            $migration.down.code.indent(4) ~ "\n" ~
+            $down.code.indent(4) ~ "\n" ~
             '}';
 
         my $code = '<?php' ~ "\n\n" ~ 'use yii\db\Migration;' ~ "\n\n" ~
-            "class $class_name extends Migration\n" ~
+            "class $class extends Migration\n" ~
             "\{\n" ~
             $body.indent(4) ~ "\n" ~
             "}\n";
 
         unless ' ' x 4 eq $migration.indent {
-            $code.=subst(/^^(' ' ** 4)+/, { $migration.indent x $0.elems }, :g);
+            $code.=subst(/^^(' ' ** 4)+/, { $!indent x $0.elems }, :g);
         }
 
         $filename.spurt($code, :createonly)
             or X::App::IO.new(pyload => "cannot create file - `$filename`");
+        put "* $rel-file";
 
         $!time.=later(:5second);
     }
 }
 
 sub transform(IO::Handle :$input, TransformFormat :$format, MigrationExporter :$exporter) {
+    put "$PROJECT_NAME ver. $PROJECT_VER"   if IS_I;
+    put "Interactive mode"                  if IS_I;
+    print '> '                              if IS_I;
+
     my @migrations;
     my Int $line_number = 0;
+
+    # https://rt.perl.org/Public/Bug/Display.html?id=132076
+    # last/next inside CATCH does not work ever - neither anonymouse nor labeled
+    #
+    # `IO::Handle.lines` reads input lazily. Label for the loop
+    # could not be found - an exception cause some corruptions.
+    #
+    # So, here is `Bool $goto-next` to solve CATCH blocks.
     for $input.lines -> $line {
+        NEXT {
+            print '> '      if IS_I;
+        }
+        LAST {
+            put '(EOF)'     if IS_I;
+        }
+
         ++$line_number;
         next unless $line.trim;
         my $statement;
+        my $goto-next = False;
         try {
-            $statement = MigrationSource.parse($line, rule => 'statement');
+            $statement = MigrationSource.parse($line, :rule<statement>);
+
             CATCH {
                 when X::App::MatchFail {
-                    abort "syntax: $_ - at line $line_number";
+                    if IS_I {
+                        put "Syntax: $_";
+                        # next;
+                        $goto-next = True;
+                    }
+                    else {
+                        abort "syntax: $_ - at line $line_number";
+                    }
+                }
+                when X::App::Runtime {
+                    if IS_I {
+                        put "{.^name}: $_";
+                        # next;
+                        $goto-next = True;
+                    }
+                    else {
+                        abort "{.^name}: $_ - at line $line_number";
+                    }
                 }
             }
         }
-        $statement or abort "cannot match at line $line_number\n";
+        next if $goto-next;
+        unless $statement {
+            if IS_I {
+                put 'Syntax mismatch';
+                next;
+            }
+            abort "cannot match at line $line_number\n";
+        }
+
+        next with $statement<comment-line>;
+
+        my $migration;
         try {
-            @migrations.push({
+            $migration = {
                 migration => $format.make-migration($statement),
                 line => $line_number,
-            });
+            };
+
             CATCH {
                 when X::App::Runtime {
-                    abort "{.^name}: $_ - at line $line_number";
+                    if IS_I {
+                        put "{.^name}: $_";
+                        # next;
+                        $goto-next = True;
+                    }
+                    else {
+                        abort "{.^name}: $_ - at line $line_number";
+                    }
                 }
             }
+        }
+        next if $goto-next;
+
+        if IS_I {
+            try {
+                $exporter.export($migration<migration>);
+                CATCH {
+                    when X::App::Runtime {
+                        put "{.^name}: $_";
+                        # next;
+                        # nothing to skip
+                    }
+                }
+            }
+        }
+        else {
+            @migrations.push($migration);
         }
     }
 
@@ -798,16 +952,20 @@ sub transform(IO::Handle :$input, TransformFormat :$format, MigrationExporter :$
 
 my constant DEFAULT_INDENT = ' ' x 4;
 
-multi sub MAIN('yii2',
-    Str:D :$path   = './migrations',
-    Str:D :$indent = DEFAULT_INDENT,
-    Bool:D :$list-types = False,
-) {
-    if $list-types {
-        .put for Yii2Format.data-types.sort;
-        exit 0;
-    }
+my %*SUB-MAIN-OPTS = (
+    :named-anywhere,
+);
 
+multi sub MAIN('yii2', 'list-types') {
+    .put for Yii2Format.data-types.sort;
+}
+
+multi sub MAIN('yii2',
+    Str:D :$path         = './migrations',
+    Str:D :$indent       = DEFAULT_INDENT,
+    Str:D :$class-prefix = 'm%y%m%d_%H%M%S_',
+    Str:D :$dir-chmod    = '775',
+) {
     my $path_io = $path.IO;
     with $path_io {
         unless .e && .d {
@@ -817,17 +975,84 @@ multi sub MAIN('yii2',
 
     transform(
         input    => $*IN,
-        format   => Yii2Format.new(:$indent),
-        exporter => Yii2Exporter.new(path => $path_io),
+        format   => Yii2Format.new,
+        exporter => Yii2Exporter.new(
+            :path($path_io),
+            :$indent,
+            :$class-prefix,
+            :dir-chmod(:8($dir-chmod))
+        ),
     );
 }
 
-multi sub MAIN(
-    Str:D :$indent = DEFAULT_INDENT,
-) {
+multi sub MAIN() {
     transform(
         input    => $*IN,
-        format   => Yii2Format.new(:$indent),
+        format   => Yii2Format.new,
         exporter => DebugExporter.new,
     );
+}
+
+sub get-usage() {
+    Q:c:to/_END/;
+    Usage:
+        {$*PROGRAM-NAME}
+
+        {$*PROGRAM-NAME} yii2 [<options>]
+        {$*PROGRAM-NAME} yii2 list-types
+
+        {$*PROGRAM-NAME} man
+    _END
+}
+
+multi sub MAIN('man') {
+    print Q:c:to/_END/;
+    {$PROJECT_NAME} v{$PROJECT_VER}
+
+    {get-usage()}
+    Description
+        Generates migrations from short stupid weird script.
+
+        Without arguments reads source script from the input and writes result
+        in debug style to output. When both input and output are terminal then
+        interactive mode will be enabled.
+
+        `yii2` subset toggles Yii2 migrations to be generated into given directory.
+
+    Options
+
+        **yii2**
+
+        --class-prefix=<format>
+            Format to generate path and filename prefix for migrations under
+            the `--path` directory. Default format `m%y%m%d_%H%M%S_` will
+            produce classes names like so:
+
+                m170829_150305_create_user
+                m170829_150310_add_idx_user_mail
+                ...
+
+            Supported placeholders from `date(1)` are: %Y %y %m %d %H %M %S.
+
+            Format can contain `/` to create subdirectories.
+
+        --dir-chmod=<mode>
+            Permissions for subdirectories produced by `--class-prefix`
+            with `/` in format. Octal number. Default is `775`.
+
+        --indent=string
+            One level indention string. Will be used literally in generated
+            result. Default is four spaces.
+            To use TAB follow instructions for you shell. For example in Bash
+            you can use C-style string: $'\t' .
+
+        --path=<path>
+            Base path to store generated migrations. Path must to exist. Default
+            is `./migrations` .
+
+    _END
+}
+
+sub USAGE() {
+    print get-usage();
 }

@@ -1,0 +1,13 @@
+language: perl6
+perl6:
+  - latest
+  - '2017.07'
+
+sudo: false
+
+branches:
+  only:
+    - master
+
+script:
+  - tests/iotester/bin/iotester -p
