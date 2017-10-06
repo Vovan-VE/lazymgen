@@ -42,7 +42,7 @@ grammar MigrationSource {
     token null_mark { '?' }
 
     rule default_value { ['=' <!before '>'>] ~ <value> <?> }
-    rule numbers-list { <number>+ % ',' }
+    rule numbers-list { [<number> ]+ % [',' ] }
     rule params { '(' ~ ')' <numbers-list>? }
     rule type {
         [':' ~ <name> <?>]
@@ -52,7 +52,7 @@ grammar MigrationSource {
     }
     rule column_definition { <name> ~ <type> <?> }
 
-    rule column-definition-list { <column_definition>* % ',' }
+    rule column-definition-list { [<column_definition> ]+ % [',' ] }
     rule create_table_body { '(' ~ ')' <column-definition-list> }
 
     token pos_first { '^' }
@@ -74,7 +74,7 @@ grammar MigrationSource {
 
     rule columns-ref {
         '.' ~ <columns=.name> ** 1 <?>
-        | '(' ~ ')' [ <columns=.name>+ % ',' ]
+        | '(' ~ ')' [[<columns=.name> ]+ % [',' ] ]
     }
     rule table_columns_ref { <table> ~ <columns-ref> <?> }
 
@@ -186,7 +186,7 @@ class Migration {
         @!header.push(
             "",
             "Source:",
-            "    $!source",
+            "    {$!source.trim}",
         );
 
         self;
@@ -355,7 +355,10 @@ class DebugExporter does MigrationExporter {
 
 class Yii2Statement is Statement {
     method filter-name(Str:D $name --> Str:D) {
-        $name.subst(/ :i <-[ a..z \d ]>+ /, '_', :g);
+        $name
+            .subst(/ :i <-[ a..z \d ]>+ /, '_', :g)
+            .subst(/ ^ _+ || _+ $ /, '', :g)
+            || 'noname';
     }
 }
 
@@ -582,16 +585,16 @@ class Yii2Format does TransformFormat {
         return self.name($alias<name>) if $alias ~~ Match:D;
         my @tables;
         my @columns;
-        # $*ERR.say(@table-col-refs);
+        # note @table-col-refs;
         for @table-col-refs {
             # $*ERR.say($(:TABLE($_<table>), :COLUMNS($_<columns>)));
-            push |.list for @tables, @columns Z $_<table>, $_<columns-ref><columns>;
+            push |.list for @tables, @columns Z $_<table>, $_<columns-ref><columns>.list.map({ self.name($_) }).cache;
         }
-        # $*ERR.say($(:@tables, :@columns));
+        # note $(:@tables, :@columns);
         for @tables {
             $_ = self.table($_);
         }
-        # $*ERR.say($(:@tables, :@columns).perl);
+        # note $(:@tables, :@columns).perl;
 
         my @refs = (@tables Z @columns).flat;
 
