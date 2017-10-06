@@ -1,3 +1,3 @@
-[submodule "tests/iotester"]
-	path = tests/iotester
+[submodule "iotester"]
+	path = vendor/iotester
 	url = https://github.com/Vovan-VE/iotester.git
