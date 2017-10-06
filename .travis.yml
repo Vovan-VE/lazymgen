@@ -5,9 +5,9 @@ perl6:
 
 sudo: false
 
-# branches:
-#   only:
-#     - master
+branches:
+  only:
+    - master
 
 script:
   - tests/iotester/bin/iotester -p
