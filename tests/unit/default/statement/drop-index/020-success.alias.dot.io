@@ -2,7 +2,7 @@
 - I @key-name %table-name . column-name
 ---- OUT ----
 $> drop_key_name
-    > Generated with Lazy Migration Generator/0.0.1
+    > Generated with Lazy Migration Generator
     > Format: Yii2
     >
     > Source:

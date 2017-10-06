@@ -2,7 +2,7 @@
 - FK @key-name %child ( parent_id ) => %parent ( id )
 ---- OUT ----
 $> drop_key_name
-    > Generated with Lazy Migration Generator/0.0.1
+    > Generated with Lazy Migration Generator
     > Format: Yii2
     >
     > Source:

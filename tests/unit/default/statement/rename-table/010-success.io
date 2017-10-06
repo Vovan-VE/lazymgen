@@ -2,7 +2,7 @@
 * %old-table-name => %new-table-name
 ---- OUT ----
 $> rename_old_table_name_new_table_name
-    > Generated with Lazy Migration Generator/0.0.1
+    > Generated with Lazy Migration Generator
     > Format: Yii2
     >
     > Source:

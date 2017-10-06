@@ -2,7 +2,7 @@
 - FK %child ( parent_id ) => %parent ( id )
 ---- OUT ----
 $> drop_fk_child_parent_id_parent_id
-    > Generated with Lazy Migration Generator/0.0.1
+    > Generated with Lazy Migration Generator
     > Format: Yii2
     >
     > Source:

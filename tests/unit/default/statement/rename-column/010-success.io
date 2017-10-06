@@ -2,7 +2,7 @@
 * %table-name . old-column-name => new-column-name
 ---- OUT ----
 $> rename_table_name_old_column_name_new_column_name
-    > Generated with Lazy Migration Generator/0.0.1
+    > Generated with Lazy Migration Generator
     > Format: Yii2
     >
     > Source:

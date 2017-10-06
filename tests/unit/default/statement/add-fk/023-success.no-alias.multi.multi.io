@@ -2,7 +2,7 @@
 + FK %child ( foo , bar , lol ) => %parent ( lorem , ipsum , dolor )
 ---- OUT ----
 $> add_fk_child_foo_bar_lol_parent_lorem_ipsum_dolor
-    > Generated with Lazy Migration Generator/0.0.1
+    > Generated with Lazy Migration Generator
     > Format: Yii2
     >
     > Source:

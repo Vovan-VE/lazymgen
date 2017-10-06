@@ -2,7 +2,7 @@
 + %table . foo : bool = TRue
 ---- OUT ----
 $> add_table_foo
-    > Generated with Lazy Migration Generator/0.0.1
+    > Generated with Lazy Migration Generator
     > Format: Yii2
     >
     > Source:

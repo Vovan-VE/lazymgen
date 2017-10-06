@@ -2,7 +2,7 @@
 + PK @key-name %table-name ( column-foo , column-bar )
 ---- OUT ----
 $> add_key_name
-    > Generated with Lazy Migration Generator/0.0.1
+    > Generated with Lazy Migration Generator
     > Format: Yii2
     >
     > Source:

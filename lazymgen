@@ -178,7 +178,7 @@ class Migration {
 
     method BUILDALL(|) {
         @!header.unshift(
-            "Generated with $PROJECT_NAME/$PROJECT_VER",
+            "Generated with $PROJECT_NAME",
         );
 
         callsame;

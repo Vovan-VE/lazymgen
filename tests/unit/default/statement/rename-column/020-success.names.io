@@ -2,7 +2,7 @@
 * %table\@name\+is\|strange . \#\~column\$name\* => \!\(\)\[\]
 ---- OUT ----
 $> rename_table_name_is_strange_column_name
-    > Generated with Lazy Migration Generator/0.0.1
+    > Generated with Lazy Migration Generator
     > Format: Yii2
     >
     > Source:
