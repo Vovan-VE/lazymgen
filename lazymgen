@@ -30,106 +30,106 @@ grammar MigrationSource {
         [ :i <[-+]>? e <[- +]>? \d+ ]?
     }
     token string { \' ~ \' [ <-[' \\]>+ || \\ . ]* }
-    token value_keyword { :i <<[TRUE|FALSE|NULL]>> }
+    token value-keyword { :i <<[TRUE|FALSE|NULL]>> }
     token name {
         <!before <[ - \d ]> >
         [ [ <[ _ a..z \d ]>+ | \\ . ]+ ]+ % '-'+
     }
     token value {
         [<string> | <number>]
-        || <value_keyword>
+        || <value-keyword>
     }
-    token null_mark { '?' }
+    token null-mark { '?' }
 
-    rule default_value { ['=' <!before '>'>] ~ <value> <?> }
+    rule default-value { ['=' <!before '>'>] ~ <value> <?> }
     rule numbers-list { [<number> ]+ % [',' ] }
     rule params { '(' ~ ')' <numbers-list>? }
     rule type {
         [':' ~ <name> <?>]
         <params>?
-        <null_mark>?
-        <default_value>?
+        <null-mark>?
+        <default-value>?
     }
-    rule column_definition { <name> ~ <type> <?> }
+    rule column-definition { <name> ~ <type> <?> }
 
-    rule column-definition-list { [<column_definition> ]+ % [',' ] }
-    rule create_table_body { '(' ~ ')' <column-definition-list> }
+    rule column-definition-list { [<column-definition> ]+ % [',' ] }
+    rule create-table-body { '(' ~ ')' <column-definition-list> }
 
-    token pos_first { '^' }
-    token pos_after { '>' }
-    rule position { <pos_first> | [<pos_after> ~ <name> <?>] }
-    rule alter_column_type { <type> <position>? }
+    token pos-first { '^' }
+    token pos-after { '>' }
+    rule position { <pos-first> | [<pos-after> ~ <name> <?>] }
+    rule alter-column-type { <type> <position>? }
 
     token alias { '@' ~ <name> <?> }
     token table { '%' ~ <name> <?> }
 
-    rule alter_column_name { '=>' ~ <name> <?> }
-    rule alter-column-to-type { '=>' ~ <alter_column_type> <?> }
-    rule alter_column_spec {
-        <alter_column_name>
-        | <alter_column_type> ~ <alter-column-to-type> <?>
+    rule alter-column-name { '=>' ~ <name> <?> }
+    rule alter-column-to-type { '=>' ~ <alter-column-type> <?> }
+    rule alter-column-spec {
+        <alter-column-name>
+        | <alter-column-type> ~ <alter-column-to-type> <?>
     }
-    rule alter_column { <name> ~ <alter_column_spec> <?> }
-    rule rename_table { '=>' ~ <table> <?> }
+    rule alter-column { <name> ~ <alter-column-spec> <?> }
+    rule rename-table { '=>' ~ <table> <?> }
 
     rule columns-ref {
         '.' ~ <columns=.name> ** 1 <?>
         | '(' ~ ')' [[<columns=.name> ]+ % [',' ] ]
     }
-    rule table_columns_ref { <table> ~ <columns-ref> <?> }
+    rule table-columns-ref { <table> ~ <columns-ref> <?> }
 
-    token fk_restrict { '!' }
-    token fk_cascade { '>' }
-    token fk_set_null { '?' }
-    token fk_verb { <fk_restrict> | <fk_cascade> | <fk_set_null> }
-    token fk_on_delete { '~' ~ <fk_verb> <?> }
-    token fk_on_update { '*' ~ <fk_verb> <?> }
-    rule fk-target { '=>' ~ <target=.table_columns_ref> <?> }
-    rule fk-map { <source=.table_columns_ref> ~ <fk-target> <?> }
+    token fk-restrict { '!' }
+    token fk-cascade { '>' }
+    token fk-set-null { '?' }
+    token fk-verb { <fk-restrict> | <fk-cascade> | <fk-set-null> }
+    token fk-on-delete { '~' ~ <fk-verb> <?> }
+    token fk-on-update { '*' ~ <fk-verb> <?> }
+    rule fk-target { '=>' ~ <target=.table-columns-ref> <?> }
+    rule fk-map { <source=.table-columns-ref> ~ <fk-target> <?> }
     rule fk-spec { <alias>? ~ <fk-map> <?> }
-    rule fk_statement {
+    rule fk-statement {
         [:i<<FK>>] ~ <fk-spec> <?>
         [
-            <fk_on_delete> <fk_on_update>?
-            | <fk_on_update> <fk_on_delete>?
+            <fk-on-delete> <fk-on-update>?
+            | <fk-on-update> <fk-on-delete>?
         ]?
     }
 
-    token index_type { :i << [I | U | PK] >> }
-    rule key-spec { <alias>? ~ <table_columns_ref> <?> }
-    rule key_statement { <index_type> ~ <key-spec> <?> }
+    token index-type { :i << [I | U | PK] >> }
+    rule key-spec { <alias>? ~ <table-columns-ref> <?> }
+    rule key-statement { <index-type> ~ <key-spec> <?> }
 
-    rule add-column-spec { <name> ~ <alter_column_type> <?> }
-    rule add_column_body { '.' ~ <add-column-spec> <?> }
-    rule table-ddl-spec { <create_table_body> | <add_column_body> }
-    rule table_ddl_statement { <table> ~ <table-ddl-spec> <?> }
+    rule add-column-spec { <name> ~ <alter-column-type> <?> }
+    rule add-column-body { '.' ~ <add-column-spec> <?> }
+    rule table-ddl-spec { <create-table-body> | <add-column-body> }
+    rule table-ddl-statement { <table> ~ <table-ddl-spec> <?> }
 
-    rule ddl_statement {
-        <table_ddl_statement>
-        | <key_statement>
-        | <fk_statement>
+    rule ddl-statement {
+        <table-ddl-statement>
+        | <key-statement>
+        | <fk-statement>
     }
 
-    rule create_statement { '+' ~ <ddl_statement> <?> }
-    rule drop_statement { '-' ~ <ddl_statement> <?> }
-    rule data_statement { '=' }
-    rule alter_statement_spec {
-        <rename_table>
-        | '.' ~ <alter_column> <?>
+    rule create-statement { '+' ~ <ddl-statement> <?> }
+    rule drop-statement { '-' ~ <ddl-statement> <?> }
+    rule data-statement { '=' }
+    rule alter-statement-spec {
+        <rename-table>
+        | '.' ~ <alter-column> <?>
     }
-    rule alter_statement_body { <table> ~ <alter_statement_spec> <?> }
-    rule alter_statement {
-        '*' ~ <alter_statement_body> <?>
+    rule alter-statement-body { <table> ~ <alter-statement-spec> <?> }
+    rule alter-statement {
+        '*' ~ <alter-statement-body> <?>
     }
     rule comment-line { '#' \N* }
 
     rule statement {
         ^^ ~ $$
         [
-            <create_statement>
-            | <drop_statement>
-            | <alter_statement>
-            | <data_statement>
+            <create-statement>
+            | <drop-statement>
+            | <alter-statement>
+            | <data-statement>
             | <comment-line>
         ]
     }
@@ -248,25 +248,25 @@ role TransformFormat {
             die "expected Match under `<statement>` but got `{$s.caps[0]}`";
         }
         given $caps[0] {
-            when .key eq 'create_statement' {
-                self.ddl-statement(.value<ddl_statement>, :$back);
+            when .key eq 'create-statement' {
+                self.ddl-statement(.value<ddl-statement>, :$back);
             }
-            when .key eq 'drop_statement' {
-                self.ddl-statement(.value<ddl_statement>, back => !$back);
+            when .key eq 'drop-statement' {
+                self.ddl-statement(.value<ddl-statement>, back => !$back);
             }
-            when .key eq 'alter_statement' {
-                my $st   = .value<alter_statement_body>;
-                my $spec = $st<alter_statement_spec>;
-                if $spec<rename_table>:exists {
+            when .key eq 'alter-statement' {
+                my $st   = .value<alter-statement-body>;
+                my $spec = $st<alter-statement-spec>;
+                if $spec<rename-table>:exists {
                     return self.rename-table($st, :$back);
                 }
-                my $alt = $spec<alter_column><alter_column_spec>;
-                if $alt<alter_column_name>:exists {
+                my $alt = $spec<alter-column><alter-column-spec>;
+                if $alt<alter-column-name>:exists {
                     return self.alter-column-name($st, :$back);
                 }
                 return self.alter-column-type($st, :$back);
             }
-            when .key eq 'data_statement' {
+            when .key eq 'data-statement' {
                 return self.data-statement(.value, :$back);
             }
             default {
@@ -277,16 +277,16 @@ role TransformFormat {
 
     method ddl-statement(Match:D $s, Bool:D :$back = False --> Statement) {
         given $s.caps[0] {
-            when .key eq 'table_ddl_statement' {
-                if .value<table-ddl-spec><create_table_body>:exists {
+            when .key eq 'table-ddl-statement' {
+                if .value<table-ddl-spec><create-table-body>:exists {
                     return self.create-table(.value) unless $back;
                     return self.drop-table(.value);
                 }
                 return self.add-column(.value) unless $back;
                 return self.drop-column(.value);
             }
-            when .key eq 'key_statement' {
-                my ($type, $spec) = .value<index_type key-spec>;
+            when .key eq 'key-statement' {
+                my ($type, $spec) = .value<index-type key-spec>;
                 given $type.Str.uc {
                     when 'PK' {
                         return self.add-primary-key($spec) unless $back;
@@ -305,12 +305,12 @@ role TransformFormat {
                     }
                 }
             }
-            when .key eq 'fk_statement' {
+            when .key eq 'fk-statement' {
                 return self.add-foreigh-key(.value) unless $back;
                 return self.drop-foreign-key(.value);
             }
             default {
-                die "expected Match under `<ddl_statement>` but got `{.key}`";
+                die "expected Match under `<ddl-statement>` but got `{.key}`";
             }
         }
     }
@@ -322,7 +322,7 @@ role TransformFormat {
     method default-value(Match:D $default --> Str) {
         my $v = $default<value>;
         return .Str         with $v<number>;
-        return .Str.lc      with $v<value_keyword>;
+        return .Str.lc      with $v<value-keyword>;
         return self.string(
             $v<string>.Str
                 .substr(1, *-1)
@@ -405,9 +405,9 @@ class Yii2Format does TransformFormat {
     };
 
     my constant FK_ACTION = {
-        fk_restrict => 'RESTRICT',
-        fk_cascade  => 'CASCADE',
-        fk_set_null => 'SET NULL',
+        fk-restrict => 'RESTRICT',
+        fk-cascade  => 'CASCADE',
+        fk-set-null => 'SET NULL',
     };
 
     my constant S_FK = 'fk';
@@ -428,7 +428,7 @@ class Yii2Format does TransformFormat {
 
     method create-table(Match:D $s --> Yii2Statement) {
         my ($table, $create) = $s<table table-ddl-spec>;
-        $create = $create<create_table_body>;
+        $create = $create<create-table-body>;
         Yii2Statement.new(
             :name("create_{self.table($table)}"),
             :code(
@@ -441,7 +441,7 @@ class Yii2Format does TransformFormat {
                 "}\n" ~
                 "\n" ~
                 '$this->createTable(' ~ self.table-string($table) ~ ", [\n" ~
-                $create<column-definition-list><column_definition>.list.map({
+                $create<column-definition-list><column-definition>.list.map({
                     my ($name, $type) = .hash<name type>;
                     self.name-string($name) ~ ' => ' ~ self.column-type($type) ~ ',';
                 }).join("\n").indent(4) ~ "\n" ~
@@ -459,8 +459,8 @@ class Yii2Format does TransformFormat {
 
     method add-column(Match:D $s --> Yii2Statement) {
         my ($table, $add_col) = $s<table table-ddl-spec>;
-        $add_col = $add_col<add_column_body><add-column-spec>;
-        my ($column, $type_pos) = $add_col<name alter_column_type>;
+        $add_col = $add_col<add-column-body><add-column-spec>;
+        my ($column, $type_pos) = $add_col<name alter-column-type>;
         Yii2Statement.new(
             :name("add_{self.table($table)}_{self.name($column)}"),
             :code(
@@ -476,7 +476,7 @@ class Yii2Format does TransformFormat {
     }
     method drop-column(Match:D $s --> Yii2Statement) {
         my ($table, $add_col) = $s<table table-ddl-spec>;
-        $add_col = $add_col<add_column_body><add-column-spec>;
+        $add_col = $add_col<add-column-body><add-column-spec>;
         my ($column) = $add_col<name>;
         Yii2Statement.new(
             :name("drop_{self.table($table)}_{self.name($column)}"),
@@ -511,7 +511,7 @@ class Yii2Format does TransformFormat {
     }
 
     method !index-common(Match:D $s, Str $namePrefix, Str $method, Str $prefix, Bool:D :$cols = False, Str :$tag --> Yii2Statement) {
-        my ($alias, $ref) = $s<alias table_columns_ref>;
+        my ($alias, $ref) = $s<alias table-columns-ref>;
         my $index_name = self.index-name($prefix, $alias, $ref);
         Yii2Statement.new(
             :name($namePrefix ~ $index_name),
@@ -538,7 +538,7 @@ class Yii2Format does TransformFormat {
     }
 
     method add-foreigh-key(Match:D $s, Bool:D :$back = False --> Yii2Statement) {
-        my ($spec, $d, $u) = $s<fk-spec fk_on_delete fk_on_update>;
+        my ($spec, $d, $u) = $s<fk-spec fk-on-delete fk-on-update>;
         my ($a, $map) = $spec<alias fk-map>;
         my ($f, $t) = $map<source fk-target>;
         $t = $t<target>;
@@ -608,8 +608,8 @@ class Yii2Format does TransformFormat {
     }
 
     method rename-table(Match:D $s, Bool:D :$back = False --> Yii2Statement) {
-        my ($from_table, $to_table) = $s<table alter_statement_spec>;
-        $to_table = $to_table<rename_table><table>;
+        my ($from_table, $to_table) = $s<table alter-statement-spec>;
+        $to_table = $to_table<rename-table><table>;
         ($from_table, $to_table) = $to_table, $from_table if $back;
         Yii2Statement.new(
             :name("rename_{self.table($from_table)}_{self.table($to_table)}"),
@@ -623,9 +623,9 @@ class Yii2Format does TransformFormat {
 
     method alter-column-name(Match:D $s, Bool:D :$back = False --> Yii2Statement) {
         my $table = $s<table>;
-        my ($from_name, $to_name) = $s<alter_statement_spec><alter_column><name alter_column_spec>;
+        my ($from_name, $to_name) = $s<alter-statement-spec><alter-column><name alter-column-spec>;
         $from_name = self.name($from_name);
-        $to_name = self.name($to_name<alter_column_name><name>);
+        $to_name = self.name($to_name<alter-column-name><name>);
         ($from_name, $to_name) = $to_name, $from_name if $back;
         Yii2Statement.new(
             :name("rename_{self.table($table)}_{$from_name}_{$to_name}"),
@@ -639,11 +639,11 @@ class Yii2Format does TransformFormat {
     }
     method alter-column-type(Match:D $s, Bool:D :$back = False --> Yii2Statement) {
         my $table = $s<table>;
-        my ($name, $spec) = $s<alter_statement_spec><alter_column><name alter_column_spec>;
+        my ($name, $spec) = $s<alter-statement-spec><alter-column><name alter-column-spec>;
         $name = self.name($name);
         my $type = $back
-            ?? $spec<alter_column_type>
-            !! $spec<alter-column-to-type><alter_column_type>;
+            ?? $spec<alter-column-type>
+            !! $spec<alter-column-to-type><alter-column-type>;
         Yii2Statement.new(
             :name("alter_{self.table($table)}_$name"),
             :code(
@@ -676,12 +676,12 @@ class Yii2Format does TransformFormat {
         my ($type, $pos) = $t<type position>;
         $type = self.column-type($type);
         return $type without $pos;
-        return $type ~ '->first()' if $pos<pos_first>;
+        return $type ~ '->first()' if $pos<pos-first>;
         return $type ~ '->after(' ~ self.name-string($pos<name>) ~ ')';
     }
 
     method column-type(Match:D $t --> Str) {
-        my ($name, $params, $null, $default) = $t<name params null_mark default_value>;
+        my ($name, $params, $null, $default) = $t<name params null-mark default-value>;
         $name = self.name($name);
         my $params-joined = '';
         with $params {
@@ -730,12 +730,12 @@ class Yii2Format does TransformFormat {
     }
 
     multi method fk-action-string(Match:D $on) {
-        my $action = $on<fk_verb>.hash.keys[0];
+        my $action = $on<fk-verb>.hash.keys[0];
         die "unexpected FK action `$action`" unless FK_ACTION{$action}:exists;
         self.string(FK_ACTION{$action});
     }
     multi method fk-action-string(Any:U) {
-        self.string(FK_ACTION<fk_restrict>);
+        self.string(FK_ACTION<fk-restrict>);
     }
 }
 
