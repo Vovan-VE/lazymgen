@@ -85,7 +85,7 @@ If IO Tester is not available in $PATH, use one from Git submodule:
 
 ```sh
 $ git submodule update --init
-$ tests/iotester/bin/iotester
+$ vendor/iotester/bin/iotester
 ```
 
 

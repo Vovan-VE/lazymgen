@@ -23,69 +23,81 @@ sub abort(Str:D $message) {
 grammar MigrationSource {
     token ws { <!ww> \h* }
 
-    token number {
-        <[- +]>?
-        [ 0 || <[1..9]> \d* ]
-        [ '.' \d+ ]?
-        [ :i <[-+]>? e <[- +]>? \d+ ]?
-    }
-    token string { \' ~ \' [ <-[' \\]>+ || \\ . ]* }
-    token value-keyword { :i <<[TRUE|FALSE|NULL]>> }
-    token name {
+    token num-sign { <[- +]> }
+    token num-int { 0 | <[1..9]> \d* }
+    token num-frac { '.' \d+ }
+    token num-exp { :i e <.num-sign>? \d+ }
+    token number { <.num-sign>? <.num-int> <.num-frac>? <.num-exp>? }
+
+    token quote { \' }
+    token string-content { [ <-[' \\]>+ | \\ . ]* }
+    token str-start { <.quote> }
+    token str-end { <.quote> }
+    token string-content-with-end { <string-content> ~ <.str-end> <?> }
+    token string { <.str-start> ~ <string-content-with-end> <?> }
+
+    token value-keyword { :i << [ TRUE | FALSE | NULL ] >> }
+
+    token name-word {
+        :i
         <!before <[ - \d ]> >
-        [ [ <[ _ a..z \d ]>+ | \\ . ]+ ]+ % '-'+
+        [ <[ _ a..z \d ]>+ | \\ . ]+
     }
-    token value {
-        [<string> | <number>]
-        || <value-keyword>
-    }
-    token null-mark { '?' }
+    token name { <.name-word>+ % '-'+ }
+
+    proto token value {*}
+    token value:sym<string> { <string> }
+    token value:sym<number> { <number> }
+    token value:sym<value-keyword> { <value-keyword> }
 
     rule default-value { ['=' <!before '>'>] ~ <value> <?> }
-    rule numbers-list { [<number> ]+ % [',' ] }
-    rule params { '(' ~ ')' <numbers-list>? }
+    rule numbers-list { [<number> ]* % [',' ] }
+    rule params-list { <numbers-list> ~ ')' <?> }
+    rule params { '(' ~ <params-list> <?> }
+    token null-mark { '?' }
     rule type {
         [':' ~ <name> <?>]
         <params>?
         <null-mark>?
         <default-value>?
     }
+
     rule column-definition { <name> ~ <type> <?> }
 
     rule column-definition-list { [<column-definition> ]+ % [',' ] }
-    rule create-table-body { '(' ~ ')' <column-definition-list> }
+    rule columns-definitions-end { <column-definition-list> ~ ')' <?> }
+    rule create-table-body { '(' ~ <columns-definitions-end> <?> }
 
-    token pos-first { '^' }
-    token pos-after { '>' }
-    rule position { <pos-first> | [<pos-after> ~ <name> <?>] }
+    proto rule position {*}
+    rule position:sym<first> { '^' }
+    rule position:sym<after> { '>' ~ <name> <?> }
+
     rule alter-column-type { <type> <position>? }
 
     token alias { '@' ~ <name> <?> }
     token table { '%' ~ <name> <?> }
 
-    rule alter-column-name { '=>' ~ <name> <?> }
-    rule alter-column-to-type { '=>' ~ <alter-column-type> <?> }
-    rule alter-column-spec {
-        <alter-column-name>
-        | <alter-column-type> ~ <alter-column-to-type> <?>
-    }
+    rule alter-column-type-to { <alter-column-type> ~ '=>' <?> }
+    proto rule alter-column-spec {*}
+    rule alter-column-spec:sym<name> { '=>' ~ <name> <?> }
+    rule alter-column-spec:sym<type> { <alter-column-type-to> ~ <alter-column-type> <?> }
     rule alter-column { <name> ~ <alter-column-spec> <?> }
     rule rename-table { '=>' ~ <table> <?> }
 
-    rule columns-ref {
-        '.' ~ <columns=.name> ** 1 <?>
-        | '(' ~ ')' [[<columns=.name> ]+ % [',' ] ]
-    }
+    rule names-list { [<name> ]+ % [',' ] }
+    proto rule columns-ref {*}
+    rule columns-ref:<dot> { '.' ~ <name> <?> }
+    rule columns-ref:<list> { '(' ~ ')' <names-list> }
     rule table-columns-ref { <table> ~ <columns-ref> <?> }
 
-    token fk-restrict { '!' }
-    token fk-cascade { '>' }
-    token fk-set-null { '?' }
-    token fk-verb { <fk-restrict> | <fk-cascade> | <fk-set-null> }
+    proto token fk-verb {*}
+    token fk-verb:sym<restrict> { '!' }
+    token fk-verb:sym<cascade> { '>' }
+    token fk-verb:sym<set-null> { '?' }
     token fk-on-delete { '~' ~ <fk-verb> <?> }
     token fk-on-update { '*' ~ <fk-verb> <?> }
-    rule fk-target { '=>' ~ <target=.table-columns-ref> <?> }
-    rule fk-map { <source=.table-columns-ref> ~ <fk-target> <?> }
+    rule fk-target { '=>' ~ <table-columns-ref> <?> }
+    rule fk-map { <table-columns-ref> ~ <fk-target> <?> }
     rule fk-spec { <alias>? ~ <fk-map> <?> }
     rule fk-statement {
         [:i<<FK>>] ~ <fk-spec> <?>
@@ -101,39 +113,38 @@ grammar MigrationSource {
 
     rule add-column-spec { <name> ~ <alter-column-type> <?> }
     rule add-column-body { '.' ~ <add-column-spec> <?> }
-    rule table-ddl-spec { <create-table-body> | <add-column-body> }
+    proto rule table-ddl-spec {*}
+    rule table-ddl-spec:sym<create> { <create-table-body> }
+    rule table-ddl-spec:sym<add-col> { <add-column-body> }
     rule table-ddl-statement { <table> ~ <table-ddl-spec> <?> }
 
-    rule ddl-statement {
-        <table-ddl-statement>
-        | <key-statement>
-        | <fk-statement>
-    }
+    proto rule ddl-statement {*}
+    rule ddl-statement:<table> { <table-ddl-statement> }
+    rule ddl-statement:<key> { <key-statement> }
+    rule ddl-statement:<fk> { <fk-statement> }
 
     rule create-statement { '+' ~ <ddl-statement> <?> }
     rule drop-statement { '-' ~ <ddl-statement> <?> }
+
     rule data-statement { '=' }
-    rule alter-statement-spec {
-        <rename-table>
-        | '.' ~ <alter-column> <?>
-    }
+
+    proto rule alter-statement-spec {*}
+    rule alter-statement-spec:sym<rename-table> { <rename-table> }
+    rule alter-statement-spec:sym<alter-column> { '.' ~ <alter-column> <?> }
     rule alter-statement-body { <table> ~ <alter-statement-spec> <?> }
-    rule alter-statement {
-        '*' ~ <alter-statement-body> <?>
-    }
+    rule alter-statement { '*' ~ <alter-statement-body> <?> }
+
     rule comment-line { '#' \N* }
 
-    rule statement {
-        ^^ ~ $$
-        [
-            <create-statement>
-            | <drop-statement>
-            | <alter-statement>
-            | <data-statement>
-            | <comment-line>
-        ]
-    }
-    rule TOP { <statement>* % [$ | \n] }
+    proto rule statement-body {*}
+    rule statement-body:sym<create> { <create-statement> }
+    rule statement-body:sym<drop> { <drop-statement> }
+    rule statement-body:sym<alter> { <alter-statement> }
+    rule statement-body:sym<data> { <data-statement> }
+    rule statement-body:sym<comment> { <comment-line> }
+
+    rule statement-start { ^^ ~ <statement-body> <?> }
+    rule TOP { <statement-start> ~ $$ <?> }
 
     method FAILGOAL($goal) {
         my $after = self.target.substr((self.pos - 10 max 0) ..^ self.pos);
@@ -150,6 +161,257 @@ grammar MigrationSource {
             payload => "expected `{$goal.trim}`{$after} {$near} at position {self.pos}"
         );
     }
+}
+
+my constant POS_FIRST = 'first';
+my constant POS_AFTER = 'after';
+
+my constant ALTER_NAME = 'name';
+my constant ALTER_TYPE = 'type';
+
+my constant FK_RESTRICT = 'restrict';
+my constant FK_CASCADE  = 'cascade';
+my constant FK_SET_NULL = 'set-null';
+
+my constant ST_EMPTY        = 'empty';
+my constant ST_CREATE_TABLE = 'create-table';
+my constant ST_ADD_COLUMN   = 'add-column';
+my constant ST_PRIMARY      = 'primary';
+my constant ST_UNIQUE       = 'unique';
+my constant ST_INDEX        = 'index';
+my constant ST_FK           = 'foreign-key';
+my constant ST_DATA         = 'data';
+my constant ST_RENAME_TABLE = 'rename-table';
+my constant ST_ALTER_COLUMN = 'alter-column';
+
+class App::Number {
+    has Str:D $.source is required;
+
+    multi method gist(App::Number: --> Str) {
+        "{self.^name}({$!source})";
+    }
+}
+
+class MigrationSourceActions {
+    my %keyword-value = (
+        TRUE  => True,
+        FALSE => False,
+        NULL  => Nil,
+    );
+    my %key-type = (
+        PK => ST_PRIMARY,
+        U  => ST_UNIQUE,
+        I  => ST_INDEX,
+    );
+
+    method !unescape ($str) { $str.subst(/ \\ (.) /, { $0 }, :g) }
+
+    method number ($/) { make App::Number.new(source => $/.Str) }
+
+    method string-content ($/) { make self!unescape($/.Str) }
+    method string-content-with-end ($/) { make $<string-content>.made }
+    method string ($/) { make $<string-content-with-end>.made }
+
+    method value-keyword ($/) { make $/.Str.uc }
+
+    method name ($/) { make self!unescape($/.Str) }
+
+    method value:sym<string> ($/) { make $<string>.made }
+    method value:sym<number> ($/) { make $<number>.made }
+    method value:sym<value-keyword> ($/) { make %keyword-value{$<value-keyword>.made} }
+
+    method default-value ($/) { make $<value>.made }
+    method numbers-list ($/) { make $<number>».made }
+    method params-list ($/) { make $<numbers-list>.made }
+    method params ($/) { make $<params-list>.made }
+    method type ($/) {
+        make {
+            name          => $<name>.made,
+            params        => $<params>.made // [],
+            null          => $<null-mark>.Bool,
+            default       => $<default-value>.Bool,
+            default-value => $<default-value>.made,
+        };
+    }
+
+    method column-definition ($/) {
+        make {
+            name => $<name>.made,
+            type => $<type>.made,
+        };
+    }
+
+    method column-definition-list ($/) { make $<column-definition>».made }
+    method columns-definitions-end ($/) { make $<column-definition-list>.made }
+    method create-table-body ($/) { make $<columns-definitions-end>.made }
+
+    method position:sym<first> ($/) { make {pos => POS_FIRST} }
+    method position:sym<after> ($/) { make {pos => POS_AFTER, name => $<name>.made} }
+
+    method alter-column-type ($/) {
+        make {
+            type     => $<type>.made,
+            position => $<position>.made,
+        }
+    }
+
+    method alias ($/) { make $<name>.made }
+    method table ($/) { make $<name>.made }
+
+    method alter-column-type-to ($/) { make $<alter-column-type>.made }
+    method alter-column-spec:sym<name> ($/) {
+        make {
+            alt => ALTER_NAME,
+            to  => $<name>.made,
+        };
+    }
+    method alter-column-spec:sym<type> ($/) {
+        make {
+            alt  => ALTER_TYPE,
+            from => $<alter-column-type-to>.made,
+            to   => $<alter-column-type>.made,
+        };
+    }
+    method alter-column ($/) {
+        make {
+            name => $<name>.made,
+            $<alter-column-spec>.made.kv,
+        };
+    }
+    method rename-table ($/) { make $<table>.made }
+
+    method names-list ($/) { make $<name>».made }
+    method columns-ref:<dot> ($/) { make [$<name>.made] }
+    method columns-ref:<list> ($/) { make $<names-list>.made }
+    method table-columns-ref ($/) {
+        make {
+            table   => $<table>.made,
+            columns => $<columns-ref>.made,
+        };
+    }
+
+    method fk-verb:sym<restrict> ($/) { make FK_RESTRICT }
+    method fk-verb:sym<cascade> ($/)  { make FK_CASCADE  }
+    method fk-verb:sym<set-null> ($/) { make FK_SET_NULL }
+    method fk-on-delete ($/) { make { delete => $<fk-verb>.made } }
+    method fk-on-update ($/) { make { update => $<fk-verb>.made } }
+    method fk-target ($/) { make $<table-columns-ref>.made }
+    method fk-map ($/) {
+        make {
+            child  => $<table-columns-ref>.made,
+            parent => $<fk-target>.made,
+        };
+    }
+    method fk-spec ($/) {
+        make {
+            alias => $<alias>.made,
+            $<fk-map>.made.kv,
+        };
+    }
+    method fk-statement ($/) {
+        make {
+            delete => FK_RESTRICT,
+            update => FK_RESTRICT,
+            $<fk-spec>.made.kv,
+            $<fk-on-delete>.made.kv,
+            $<fk-on-update>.made.kv,
+        };
+    }
+
+    method index-type ($/) { make %key-type{$/.Str.uc} }
+    method key-spec ($/) {
+        make {
+            alias => $<alias>.made,
+            $<table-columns-ref>.made.kv,
+        };
+    }
+    method key-statement ($/) {
+        make {
+            statement => $<index-type>.made,
+            $<key-spec>.made.kv,
+        };
+    }
+
+    method add-column-spec ($/) {
+        make {
+            name => $<name>.made,
+            $<alter-column-type>.made.kv,
+        };
+    }
+    method add-column-body ($/) { make $<add-column-spec>.made }
+    method table-ddl-spec:sym<create> ($/) {
+        make {
+            statement => ST_CREATE_TABLE,
+            columns   => $<create-table-body>.made,
+        };
+    }
+    method table-ddl-spec:sym<add-col> ($/) {
+        make {
+            statement => ST_ADD_COLUMN,
+            $<add-column-body>.made.kv,
+        };
+    }
+    method table-ddl-statement ($/) {
+        make {
+            table => $<table>.made,
+            $<table-ddl-spec>.made.kv,
+        };
+    }
+
+    method ddl-statement:<table> ($/) { make $<table-ddl-statement>.made }
+    method ddl-statement:<key> ($/) { make $<key-statement>.made }
+    method ddl-statement:<fk> ($/) {
+        make {
+            statement => ST_FK,
+            $<fk-statement>.made.kv,
+        };
+    }
+
+    method create-statement ($/) {
+        make {
+            create => True,
+            $<ddl-statement>.made.kv,
+        };
+    }
+    method drop-statement ($/) {
+        make {
+            drop => True,
+            $<ddl-statement>.made.kv,
+        };
+    }
+
+    method data-statement ($/) { make { statement => ST_DATA } }
+
+    method alter-statement-spec:sym<rename-table> ($/) {
+        make {
+            statement => ST_RENAME_TABLE,
+            to   => $<rename-table>.made,
+        };
+    }
+    method alter-statement-spec:sym<alter-column> ($/) {
+        make {
+            statement => ST_ALTER_COLUMN,
+            $<alter-column>.made.kv,
+        };
+    }
+    method alter-statement-body ($/) {
+        make {
+            table => $<table>.made,
+            $<alter-statement-spec>.made.kv,
+        };
+    }
+    method alter-statement ($/) { make $<alter-statement-body>.made }
+
+    method comment-line ($/) { make { statement => ST_EMPTY } }
+
+    method statement-body:sym<create>  ($/) { make $<create-statement>.made }
+    method statement-body:sym<drop>    ($/) { make $<drop-statement>.made }
+    method statement-body:sym<alter>   ($/) { make $<alter-statement>.made }
+    method statement-body:sym<data>    ($/) { make $<data-statement>.made }
+    method statement-body:sym<comment> ($/) { make $<comment-line>.made }
+
+    method statement-start ($/) { make $<statement-body>.made }
+    method TOP ($/) { make $<statement-start>.made }
 }
 
 class Statement {
@@ -217,124 +479,98 @@ role TransformFormat {
         );
     }
 
-    method create-table(Match:D $s --> Statement) {...}
-    method drop-table  (Match:D $s --> Statement) {...}
+    method create-table($s --> Statement) {...}
+    method drop-table  ($s --> Statement) {...}
 
-    method add-column (Match:D $s --> Statement) {...}
-    method drop-column(Match:D $s --> Statement) {...}
+    method add-column ($s --> Statement) {...}
+    method drop-column($s --> Statement) {...}
 
-    method add-primary-key (Match:D $s --> Statement) {...}
-    method drop-primary-key(Match:D $s --> Statement) {...}
+    method add-primary-key ($s --> Statement) {...}
+    method drop-primary-key($s --> Statement) {...}
 
-    method add-unique-key (Match:D $s --> Statement) {...}
-    method drop-unique-key(Match:D $s --> Statement) {...}
+    method add-unique-key ($s --> Statement) {...}
+    method drop-unique-key($s --> Statement) {...}
 
-    method add-index (Match:D $s --> Statement) {...}
-    method drop-index(Match:D $s --> Statement) {...}
+    method add-index ($s --> Statement) {...}
+    method drop-index($s --> Statement) {...}
 
-    method add-foreigh-key (Match:D $s, Bool:D :$back = False --> Statement) {...}
-    method drop-foreign-key(Match:D $s, Bool:D :$back = False --> Statement) {...}
+    method add-foreigh-key ($s, Bool:D :$back = False --> Statement) {...}
+    method drop-foreign-key($s, Bool:D :$back = False --> Statement) {...}
 
-    method rename-table(Match:D $s, Bool:D :$back = False --> Statement) {...}
+    method rename-table($s, Bool:D :$back = False --> Statement) {...}
 
-    method alter-column-name(Match:D $s, Bool:D :$back = False --> Statement) {...}
-    method alter-column-type(Match:D $s, Bool:D :$back = False --> Statement) {...}
+    method alter-column-name($s, Bool:D :$back = False --> Statement) {...}
+    method alter-column-type($s, Bool:D :$back = False --> Statement) {...}
 
-    method data-statement(Match:D $s, Bool:D :$back = False --> Statement) {...}
+    method data-statement($s, Bool:D :$back = False --> Statement) {...}
 
     method statement(Match:D $s, Bool:D :$back = False --> Statement) {
-        my $caps = $s.caps;
-        unless 1 === $caps.elems {
-            die "expected Match under `<statement>` but got `{$s.caps[0]}`";
-        }
-        given $caps[0] {
-            when .key eq 'create-statement' {
-                self.ddl-statement(.value<ddl-statement>, :$back);
+        my $m = $s.made;
+        given $m<statement> {
+            when ST_CREATE_TABLE {
+                return self.drop-table($m)          if $back ?^ $m<drop>;
+                return self.create-table($m);
             }
-            when .key eq 'drop-statement' {
-                self.ddl-statement(.value<ddl-statement>, back => !$back);
+            when ST_ADD_COLUMN {
+                return self.drop-column($m)         if $back ?^ $m<drop>;
+                return self.add-column($m);
             }
-            when .key eq 'alter-statement' {
-                my $st   = .value<alter-statement-body>;
-                my $spec = $st<alter-statement-spec>;
-                if $spec<rename-table>:exists {
-                    return self.rename-table($st, :$back);
-                }
-                my $alt = $spec<alter-column><alter-column-spec>;
-                if $alt<alter-column-name>:exists {
-                    return self.alter-column-name($st, :$back);
-                }
-                return self.alter-column-type($st, :$back);
+            when ST_PRIMARY {
+                return self.drop-primary-key($m)    if $back ?^ $m<drop>;
+                return self.add-primary-key($m);
             }
-            when .key eq 'data-statement' {
-                return self.data-statement(.value, :$back);
+            when ST_UNIQUE {
+                return self.drop-unique-key($m)     if $back ?^ $m<drop>;
+                return self.add-unique-key($m);
             }
-            default {
-                die "expected Match under `<statement>` but got `{.key}`";
+            when ST_INDEX {
+                return self.drop-index($m)          if $back ?^ $m<drop>;
+                return self.add-index($m);
             }
-        }
-    }
-
-    method ddl-statement(Match:D $s, Bool:D :$back = False --> Statement) {
-        given $s.caps[0] {
-            when .key eq 'table-ddl-statement' {
-                if .value<table-ddl-spec><create-table-body>:exists {
-                    return self.create-table(.value) unless $back;
-                    return self.drop-table(.value);
-                }
-                return self.add-column(.value) unless $back;
-                return self.drop-column(.value);
+            when ST_FK {
+                return self.drop-foreign-key($m)    if $back ?^ $m<drop>;
+                return self.add-foreigh-key($m);
             }
-            when .key eq 'key-statement' {
-                my ($type, $spec) = .value<index-type key-spec>;
-                given $type.Str.uc {
-                    when 'PK' {
-                        return self.add-primary-key($spec) unless $back;
-                        return self.drop-primary-key($spec);
-                    }
-                    when 'U' {
-                        return self.add-unique-key($spec) unless $back;
-                        return self.drop-unique-key($spec);
-                    }
-                    when 'I' {
-                        return self.add-index($spec) unless $back;
-                        return self.drop-index($spec);
-                    }
-                    default {
-                        die "unexpected index type `$_`";
-                    }
-                }
+            when ST_RENAME_TABLE {
+                return self.rename-table($m, :$back);
             }
-            when .key eq 'fk-statement' {
-                return self.add-foreigh-key(.value) unless $back;
-                return self.drop-foreign-key(.value);
+            when ST_ALTER_COLUMN {
+                return self.alter-column-name($m, :$back)   if ALTER_NAME eq $m<alt>;
+                return self.alter-column-type($m, :$back);
+            }
+            when ST_DATA {
+                return self.data-statement($m, :$back);
             }
             default {
-                die "expected Match under `<ddl-statement>` but got `{.key}`";
+                die "expected statement type `{.self}`";
             }
         }
     }
 
-    method table(Match:D $t --> Str) {
-        return self.name($t<name>);
+    method default-value($value --> Str) {
+        given $value {
+            when Bool {
+                return self.boolean(.self);
+            }
+            when App::Number {
+                return self.number(.self.source);
+            }
+            when Str {
+                return self.string(.self);
+            }
+            when Any:U {
+                return self.null-value;
+            }
+            default {
+                die "unexpected data type {.WHAT}";
+            }
+        }
     }
 
-    method default-value(Match:D $default --> Str) {
-        my $v = $default<value>;
-        return .Str         with $v<number>;
-        return .Str.lc      with $v<value-keyword>;
-        return self.string(
-            $v<string>.Str
-                .substr(1, *-1)
-                .subst(/\\(.)/, { $0 }, :g)
-        );
-    }
-
-    method name(Match:D $m --> Str) {
-        $m.Str.subst(/\\ (.)/, { $0 }, :g);
-    }
-
-    method string(Str:D $s --> Str) { $s }
+    method string($s --> Str) { $s }
+    method number($n --> Str) { $n }
+    method boolean($b --> Str) { ~$b }
+    method null-value(--> Str) { 'NULL' }
 
     method throw-unsupported(Str:D $message) {
         die X::App::Unsupported.new(payload => $message);
@@ -405,9 +641,9 @@ class Yii2Format does TransformFormat {
     };
 
     my constant FK_ACTION = {
-        fk-restrict => 'RESTRICT',
-        fk-cascade  => 'CASCADE',
-        fk-set-null => 'SET NULL',
+        (FK_RESTRICT) => 'RESTRICT',
+        (FK_CASCADE)  => 'CASCADE',
+        (FK_SET_NULL) => 'SET NULL',
     };
 
     my constant S_FK = 'fk';
@@ -426,11 +662,10 @@ class Yii2Format does TransformFormat {
         );
     }
 
-    method create-table(Match:D $s --> Yii2Statement) {
-        my ($table, $create) = $s<table table-ddl-spec>;
-        $create = $create<create-table-body>;
+    method create-table($s --> Yii2Statement) {
+        my ($table, $columns) = $s<table columns>;
         Yii2Statement.new(
-            :name("create_{self.table($table)}"),
+            :name("create_{$table}"),
             :code(
                 '$tableOptions = null;' ~ "\n" ~
                 q[if ($this->db->driverName === 'mysql') {] ~ "\n" ~
@@ -441,89 +676,85 @@ class Yii2Format does TransformFormat {
                 "}\n" ~
                 "\n" ~
                 '$this->createTable(' ~ self.table-string($table) ~ ", [\n" ~
-                $create<column-definition-list><column-definition>.list.map({
-                    my ($name, $type) = .hash<name type>;
-                    self.name-string($name) ~ ' => ' ~ self.column-type($type) ~ ',';
+                @($columns).map({
+                    my ($name, $type) = .<name type>;
+                    self.string($name) ~ ' => ' ~ self.column-type($type) ~ ',';
                 }).join("\n").indent(4) ~ "\n" ~
                 '], $tableOptions);'
             ),
         );
     }
-    method drop-table(Match:D $s --> Yii2Statement) {
+    method drop-table($s --> Yii2Statement) {
         my ($table) = $s<table>;
         Yii2Statement.new(
-            :name("drop_{self.table($table)}"),
+            :name("drop_{$table}"),
             :code('$this->dropTable(' ~ self.table-string($table) ~ ');')
         );
     }
 
-    method add-column(Match:D $s --> Yii2Statement) {
-        my ($table, $add_col) = $s<table table-ddl-spec>;
-        $add_col = $add_col<add-column-body><add-column-spec>;
-        my ($column, $type_pos) = $add_col<name alter-column-type>;
+    method add-column($s --> Yii2Statement) {
+        my ($table, $column, $type, $pos) = $s<table name type position>;
         Yii2Statement.new(
-            :name("add_{self.table($table)}_{self.name($column)}"),
+            :name("add_{$table}_{$column}"),
             :code(
                 '$this->addColumn(' ~ "\n" ~
                 (
                     self.table-string($table) ~ ",\n" ~
-                    self.name-string($column) ~ ",\n" ~
-                    self.column-type-pos($type_pos)
+                    self.string($column) ~ ",\n" ~
+                    self.column-type-pos($type, $pos)
                 ).indent(4) ~ "\n" ~
                 ');'
             )
         );
     }
-    method drop-column(Match:D $s --> Yii2Statement) {
-        my ($table, $add_col) = $s<table table-ddl-spec>;
-        $add_col = $add_col<add-column-body><add-column-spec>;
-        my ($column) = $add_col<name>;
+    method drop-column($s --> Yii2Statement) {
+        my ($table, $column) = $s<table name>;
         Yii2Statement.new(
-            :name("drop_{self.table($table)}_{self.name($column)}"),
+            :name("drop_{$table}_{$column}"),
             :code(
                 '$this->dropColumn(' ~
                 self.table-string($table) ~ ', ' ~
-                self.name-string($column) ~
+                self.string($column) ~
                 ');'
             )
         );
     }
 
-    method add-primary-key(Match:D $s --> Yii2Statement) {
+    method add-primary-key($s --> Yii2Statement) {
         self!index-common($s, 'add_', 'addPrimaryKey', S_PK, :cols);
     }
-    method drop-primary-key(Match:D $s --> Yii2Statement) {
+    method drop-primary-key($s --> Yii2Statement) {
         self!index-common($s, 'drop_', 'dropPrimaryKey', S_PK);
     }
 
-    method add-unique-key(Match:D $s --> Yii2Statement) {
+    method add-unique-key($s --> Yii2Statement) {
         self!index-common($s, 'add_', 'createIndex', S_IDX, :cols, :tag<true>);
     }
-    method drop-unique-key(Match:D $s --> Yii2Statement) {
+    method drop-unique-key($s --> Yii2Statement) {
         self!index-common($s, 'drop_', 'dropIndex', S_IDX);
     }
 
-    method add-index(Match:D $s --> Yii2Statement) {
+    method add-index($s --> Yii2Statement) {
         self!index-common($s, 'add_', 'createIndex', S_IDX, :cols, :tag<false>);
     }
-    method drop-index(Match:D $s --> Yii2Statement) {
+    method drop-index($s --> Yii2Statement) {
         self!index-common($s, 'drop_', 'dropIndex', S_IDX);
     }
 
-    method !index-common(Match:D $s, Str $namePrefix, Str $method, Str $prefix, Bool:D :$cols = False, Str :$tag --> Yii2Statement) {
-        my ($alias, $ref) = $s<alias table-columns-ref>;
-        my $index_name = self.index-name($prefix, $alias, $ref);
+    method !index-common($s, Str $namePrefix, Str $method, Str $prefix, Bool:D :$cols = False, Str :$tag --> Yii2Statement) {
+        my ($alias, $table, $columns) = $s<alias table columns>;
+        my $index_name = self.index-name($prefix, $alias, $s);
         Yii2Statement.new(
             :name($namePrefix ~ $index_name),
             :code(
                 '$this->' ~ $method ~ "(\n" ~
                 (
                     self.string($index_name) ~ ",\n" ~
-                    self.table-string($ref<table>) ~
+                    self.table-string($table) ~
                     ($cols
                         ?? ",\n[" ~
-                        $ref<columns-ref><columns>.list.map({
-                            self.name-string($_)
+                        @$columns.map({
+                            self.string($_)
                         }).join(', ') ~ ']'
                         !! ''
                     ) ~
@@ -537,11 +768,8 @@ class Yii2Format does TransformFormat {
         );
     }
 
-    method add-foreigh-key(Match:D $s, Bool:D :$back = False --> Yii2Statement) {
-        my ($spec, $d, $u) = $s<fk-spec fk-on-delete fk-on-update>;
-        my ($a, $map) = $spec<alias fk-map>;
-        my ($f, $t) = $map<source fk-target>;
-        $t = $t<target>;
+    method add-foreigh-key($s, Bool:D :$back = False --> Yii2Statement) {
+        my ($a, $f, $t, $d, $u) = $s<alias child parent delete update>;
         ($f, $t) = $t, $f if $back;
         my $index_name = self.index-name(S_FK, $a, $f, $t);
         Yii2Statement.new(
@@ -551,22 +779,20 @@ class Yii2Format does TransformFormat {
                 (
                     self.string($index_name) ~ ",\n" ~
                     self.table-string($f<table>) ~ ', [' ~
-                    $f<columns-ref><columns>.list.map({ self.name-string($_) }).join(', ') ~
+                    @($f<columns>).map({ self.string($_) }).join(', ') ~
                     "],\n" ~
                     self.table-string($t<table>) ~ ', [' ~
-                    $t<columns-ref><columns>.list.map({ self.name-string($_) }).join(', ') ~
+                    @($t<columns>).map({ self.string($_) }).join(', ') ~
                     "],\n" ~
-                    self.fk-action-string($d) ~ ",\n" ~
-                    self.fk-action-string($u)
+                    self.string(FK_ACTION{$d}) ~ ",\n" ~
+                    self.string(FK_ACTION{$u})
                 ).indent(4) ~ "\n" ~
                 ');'
             )
         );
     }
-    method drop-foreign-key(Match:D $s, Bool:D :$back = False --> Yii2Statement) {
-        my ($a, $map) = $s<fk-spec><alias fk-map>;
-        my ($f, $t) = $map<source fk-target>;
-        $t = $t<target>;
+    method drop-foreign-key($s, Bool:D :$back = False --> Yii2Statement) {
+        my ($a, $f, $t) = $s<alias child parent>;
         ($f, $t) = $t, $f if $back;
         my $index_name = self.index-name(S_FK, $a, $f, $t);
         Yii2Statement.new(
@@ -582,24 +808,22 @@ class Yii2Format does TransformFormat {
         );
     }
     method index-name(Str $prefix, $alias, *@table-col-refs --> Str) {
-        return self.name($alias<name>) if $alias ~~ Match:D;
+        .return     with $alias;
         my @tables;
         my @columns;
         # note @table-col-refs;
         for @table-col-refs {
             # $*ERR.say($(:TABLE($_<table>), :COLUMNS($_<columns>)));
-            push |.list for @tables, @columns Z $_<table>, $_<columns-ref><columns>.list.map({ self.name($_) }).cache;
+            push |.list for @tables, @columns Z $_<table>, $_<columns>;
         }
         # note $(:@tables, :@columns);
-        for @tables {
-            $_ = self.table($_);
-        }
         # note $(:@tables, :@columns).perl;
 
-        my @refs = (@tables Z @columns).flat;
+        my @refs = (@tables Z @columns».list).flat;
+        # note $(@refs).perl;
 
         while @refs {
-            with ($prefix, @refs.map({ .list })).flat.join('-') {
+            with ($prefix, @refs).flat.join('-') {
                 .return if .chars <= MAX_INDEX_LENGTH;
             }
             @refs.pop;
@@ -607,12 +831,11 @@ class Yii2Format does TransformFormat {
         die "too long index name in any case";
     }
 
-    method rename-table(Match:D $s, Bool:D :$back = False --> Yii2Statement) {
-        my ($from_table, $to_table) = $s<table alter-statement-spec>;
-        $to_table = $to_table<rename-table><table>;
+    method rename-table($s, Bool:D :$back = False --> Yii2Statement) {
+        my ($from_table, $to_table) = $s<table to>;
         ($from_table, $to_table) = $to_table, $from_table if $back;
         Yii2Statement.new(
-            :name("rename_{self.table($from_table)}_{self.table($to_table)}"),
+            :name("rename_{$from_table}_{$to_table}"),
             :code(
                 '$this->renameTable(' ~
                 self.table-string($from_table) ~ ', ' ~
@@ -621,14 +844,11 @@ class Yii2Format does TransformFormat {
         );
     }
 
-    method alter-column-name(Match:D $s, Bool:D :$back = False --> Yii2Statement) {
-        my $table = $s<table>;
-        my ($from_name, $to_name) = $s<alter-statement-spec><alter-column><name alter-column-spec>;
-        $from_name = self.name($from_name);
-        $to_name = self.name($to_name<alter-column-name><name>);
+    method alter-column-name($s, Bool:D :$back = False --> Yii2Statement) {
+        my ($table, $from_name, $to_name) = $s<table name to>;
         ($from_name, $to_name) = $to_name, $from_name if $back;
         Yii2Statement.new(
-            :name("rename_{self.table($table)}_{$from_name}_{$to_name}"),
+            :name("rename_{$table}_{$from_name}_{$to_name}"),
             :code(
                 '$this->renameColumn(' ~
                 self.table-string($table) ~ ', ' ~
@@ -637,28 +857,24 @@ class Yii2Format does TransformFormat {
             )
         );
     }
-    method alter-column-type(Match:D $s, Bool:D :$back = False --> Yii2Statement) {
-        my $table = $s<table>;
-        my ($name, $spec) = $s<alter-statement-spec><alter-column><name alter-column-spec>;
-        $name = self.name($name);
-        my $type = $back
-            ?? $spec<alter-column-type>
-            !! $spec<alter-column-to-type><alter-column-type>;
+    method alter-column-type($s, Bool:D :$back = False --> Yii2Statement) {
+        my ($table, $name) = $s<table name>;
+        my ($type, $pos) = ($back ?? $s<from> !! $s<to>)<type position>;
         Yii2Statement.new(
-            :name("alter_{self.table($table)}_$name"),
+            :name("alter_{$table}_$name"),
             :code(
                 '$this->alterColumn(' ~ "\n" ~
                 (
                     self.table-string($table) ~ ",\n" ~
                     self.string($name) ~ ",\n" ~
-                    self.column-type-pos($type)
+                    self.column-type-pos($type, $pos)
                 ).indent(4) ~ "\n" ~
                 ');'
             )
         );
     }
 
-    method data-statement(Match:D $s, Bool:D :$back = False --> Yii2Statement) {
+    method data-statement($s, Bool:D :$back = False --> Yii2Statement) {
         Yii2Statement.new(
             :name('update')
             :code(
@@ -672,23 +888,16 @@ class Yii2Format does TransformFormat {
         );
     }
 
-    method column-type-pos(Match:D $t --> Str) {
-        my ($type, $pos) = $t<type position>;
-        $type = self.column-type($type);
+    method column-type-pos($t, $pos --> Str) {
+        my $type = self.column-type($t);
         return $type without $pos;
-        return $type ~ '->first()' if $pos<pos-first>;
-        return $type ~ '->after(' ~ self.name-string($pos<name>) ~ ')';
+        return $type ~ '->first()' if POS_FIRST eq $pos<pos>;
+        return $type ~ '->after(' ~ self.string($pos<name>) ~ ')';
     }
 
-    method column-type(Match:D $t --> Str) {
-        my ($name, $params, $null, $default) = $t<name params null-mark default-value>;
-        $name = self.name($name);
-        my $params-joined = '';
-        with $params {
-            with .hash<numbers-list> {
-                $params-joined = .hash<number>».Str.join(', ');
-            }
-        }
+    method column-type($t --> Str) {
+        my ($name, $params, $null, $has-default, $default) = $t<name params null default default-value>;
+        my $params-joined = @($params)».source.join(', ');
 
         %types{$name}:exists or self.throw-unsupported("unknown type `$name`");
         my ($type, $appendix, $defined) = do given %types{$name} {
@@ -703,16 +912,16 @@ class Yii2Format does TransformFormat {
 
         my $ret = '$this->' ~ $type ~ '(' ~ $params-joined ~ ')';
         if $defined {
-            with $null {
+            if $null {
                 self.throw-unsupported(
                     "type `$name` (`$type`) is strictly defined so it cannot be NULL"
                 );
             }
         }
         else {
-            $ret ~= '->notNull()' without $null;
+            $ret ~= '->notNull()' unless $null;
         }
-        $ret ~= '->defaultValue(' ~ self.default-value($default) ~ ')' with $default;
+        $ret ~= '->defaultValue(' ~ self.default-value($default) ~ ')' if $has-default;
         $ret ~= * with $appendix;
         $ret;
     }
@@ -720,22 +929,11 @@ class Yii2Format does TransformFormat {
     method string(Str $s --> Str) {
         "'" ~ $s.subst(/(<[\\ ']>)/, { "\\$0" }, :g) ~ "'";
     }
+    method boolean($b --> Str) { $b.Str.lc }
+    method null-value(--> Str) { 'null' }
 
-    method table-string(Match:D $t --> Str) {
-        self.string('{{%' ~ self.table($t) ~ '}}');
-    }
-
-    method name-string(Match:D $n --> Str) {
-        self.string(self.name($n));
-    }
-
-    multi method fk-action-string(Match:D $on) {
-        my $action = $on<fk-verb>.hash.keys[0];
-        die "unexpected FK action `$action`" unless FK_ACTION{$action}:exists;
-        self.string(FK_ACTION{$action});
-    }
-    multi method fk-action-string(Any:U) {
-        self.string(FK_ACTION<fk-restrict>);
+    method table-string(Str $t --> Str) {
+        self.string('{{%' ~ $t ~ '}}');
     }
 }
 
@@ -863,7 +1061,7 @@ sub transform(IO::Handle :$input, TransformFormat :$format, MigrationExporter :$
         my $statement;
         my $goto-next = False;
         try {
-            $statement = MigrationSource.parse($line, :rule<statement>);
+            $statement = MigrationSource.parse($line, actions => MigrationSourceActions);
 
             CATCH {
                 when X::App::MatchFail {
@@ -897,13 +1095,13 @@ sub transform(IO::Handle :$input, TransformFormat :$format, MigrationExporter :$
             abort "cannot match at line $line_number\n";
         }
 
-        next with $statement<comment-line>;
+        next if ST_EMPTY eq $statement.made<statement>;
 
         my $migration;
         try {
             $migration = {
                 migration => $format.make-migration($statement),
-                line => $line_number,
+                line      => $line_number,
             };
 
             CATCH {
