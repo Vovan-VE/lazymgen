@@ -144,12 +144,35 @@ grammar MigrationSource {
     rule statement-start { ^^ ~ <statement-body> <?> }
     rule TOP { <statement-start> ~ $$ <?> }
 
+    my %goal-display = (
+        add-column-spec         => '<name>',
+        alter-column            => '<name>',
+        alter-column-spec       => '`:` or `=>`',
+        alter-column-type       => '`:`',
+        alter-statement-body    => '<table>',
+        alter-statement-spec    => '`.` or `=>`',
+        columns-definitions-end => '<name>',
+        columns-ref             => '`.` or `(`',
+        columns-ref-list-end    => '<name>',
+        ddl-statement           => '<table> , `PK` , `U` , `I` or `FK`',
+        fk-map                  => '<table>',
+        fk-target               => '`=>`',
+        fk-verb                 => '`!` , `>` or `?`',
+        # name                    => '',
+        # table                   => '`%table`',
+        table-columns-ref       => '<table>',
+        table-ddl-spec          => '`(` or `.`',
+        type                    => '`:`',
+        # value                   => '',
+    );
+
     method FAILGOAL($goal) {
         my $expected = do given $goal.trim {
-            when '$$'                       { 'EOL'  }
-            when "\\'"                      { "<'>"  }
-            when / \' ( <-[ ' \\ ]>+ ) \' / { "`$0`" }
-            default                         { .self  }
+            when '$$'                               { 'EOL'  }
+            when "\\'"                              { "<'>"  }
+            when / \' ( <-[ ' \\ ]>+ ) \' /         { "`$0`" }
+            when / '<' '.'? ( <[ a..z - ]>+ ) '>' / { %goal-display{$0} || .self }
+            default                                 { .self  }
         }
 
         my $after = self.target.substr((self.pos - 10 max 0) ..^ self.pos);
