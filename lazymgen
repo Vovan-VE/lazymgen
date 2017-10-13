@@ -167,6 +167,7 @@ grammar MigrationSource {
     );
 
     method FAILGOAL($goal) {
+        my constant CONTEXT = 10;
         my $expected = do given $goal.trim {
             when '$$'                               { 'EOL'  }
             when "\\'"                              { "<'>"  }
@@ -175,14 +176,14 @@ grammar MigrationSource {
             default                                 { .self  }
         }
 
-        my $after = self.target.substr((self.pos - 10 max 0) ..^ self.pos);
+        my $after = self.target.substr((self.pos - CONTEXT max 0) ..^ self.pos);
         $after = $after
-            ?? ' after `' ~ (self.pos > 10 ?? '...' !! '') ~ $after ~ '`'
+            ?? ' after `' ~ (self.pos > CONTEXT ?? '...' !! '') ~ $after ~ '`'
             !! "";
         my $near = self.pos < self.target.chars
             ?? 'near `'
-                ~ self.target.substr(self.pos, 10)
-                ~ (self.pos < self.target.chars - 10 ?? '...' !! '')
+                ~ self.target.substr(self.pos, CONTEXT)
+                ~ (self.pos < self.target.chars - CONTEXT ?? '...' !! '')
                 ~ '`'
             !! 'instead of EOL';
         die X::App::MatchFail.new(
