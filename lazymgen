@@ -146,10 +146,10 @@ grammar MigrationSource {
 
     method FAILGOAL($goal) {
         my $expected = do given $goal.trim {
-            when '$$'                       { 'EOL' }
-            when "\\'"                      { "<'>"         }
-            when / \' ( <-[ ' \\ ]>+ ) \' / { "`$0`"        }
-            default                         { .self         }
+            when '$$'                       { 'EOL'  }
+            when "\\'"                      { "<'>"  }
+            when / \' ( <-[ ' \\ ]>+ ) \' / { "`$0`" }
+            default                         { .self  }
         }
 
         my $after = self.target.substr((self.pos - 10 max 0) ..^ self.pos);
@@ -814,7 +814,11 @@ class Yii2Format does TransformFormat {
         );
     }
     method index-name(Str $prefix, $alias, *@table-col-refs --> Str) {
-        .return     with $alias;
+        with $alias {
+            .return if .chars <= MAX_INDEX_LENGTH;
+            self.throw-unsupported("too long index name given with alias");
+        }
+
         my @tables;
         my @columns;
         # note @table-col-refs;
@@ -834,7 +838,7 @@ class Yii2Format does TransformFormat {
             }
             @refs.pop;
         }
-        die "too long index name in any case";
+        self.throw-unsupported("too long index name in any case");
     }
 
     method rename-table($s, Bool:D :$back = False --> Yii2Statement) {
