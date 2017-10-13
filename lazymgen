@@ -167,7 +167,7 @@ grammar MigrationSource {
     );
 
     method FAILGOAL($goal) {
-        my constant CONTEXT = 10;
+        my constant CONTEXT = 20;
         my $expected = do given $goal.trim {
             when '$$'                               { 'EOL'  }
             when "\\'"                              { "<'>"  }
