@@ -29,12 +29,9 @@ grammar MigrationSource {
     token num-exp { :i e <.num-sign>? \d+ }
     token number { <.num-sign>? <.num-int> <.num-frac>? <.num-exp>? }
 
-    token quote { \' }
     token string-content { [ <-[' \\]>+ | \\ . ]* }
-    token str-start { <.quote> }
-    token str-end { <.quote> }
-    token string-content-with-end { <string-content> ~ <.str-end> <?> }
-    token string { <.str-start> ~ <string-content-with-end> <?> }
+    token string-content-with-end { <string-content> ~ \' <?> }
+    token string { \' ~ <string-content-with-end> <?> }
 
     token value-keyword { :i << [ TRUE | FALSE | NULL ] >> }
 
@@ -85,9 +82,10 @@ grammar MigrationSource {
     rule rename-table { '=>' ~ <table> <?> }
 
     rule names-list { [<name> ]+ % [',' ] }
+    rule columns-ref-list-end { <names-list> ~ ')' <?> }
     proto rule columns-ref {*}
     rule columns-ref:<dot> { '.' ~ <name> <?> }
-    rule columns-ref:<list> { '(' ~ ')' <names-list> }
+    rule columns-ref:<list> { '(' ~ <columns-ref-list-end> <?> }
     rule table-columns-ref { <table> ~ <columns-ref> <?> }
 
     proto token fk-verb {*}
@@ -147,6 +145,13 @@ grammar MigrationSource {
     rule TOP { <statement-start> ~ $$ <?> }
 
     method FAILGOAL($goal) {
+        my $expected = do given $goal.trim {
+            when '$$'                       { 'EOL' }
+            when "\\'"                      { "<'>"         }
+            when / \' ( <-[ ' \\ ]>+ ) \' / { "`$0`"        }
+            default                         { .self         }
+        }
+
         my $after = self.target.substr((self.pos - 10 max 0) ..^ self.pos);
         $after = $after
             ?? ' after `' ~ (self.pos > 10 ?? '...' !! '') ~ $after ~ '`'
@@ -156,9 +161,9 @@ grammar MigrationSource {
                 ~ self.target.substr(self.pos, 10)
                 ~ (self.pos < self.target.chars - 10 ?? '...' !! '')
                 ~ '`'
-            !! 'instead of EOF';
+            !! 'instead of EOL';
         die X::App::MatchFail.new(
-            payload => "expected `{$goal.trim}`{$after} {$near} at position {self.pos}"
+            payload => "expected {$expected}{$after} {$near} at position {self.pos}"
         );
     }
 }
@@ -281,8 +286,9 @@ class MigrationSourceActions {
     method rename-table ($/) { make $<table>.made }
 
     method names-list ($/) { make $<name>».made }
+    method columns-ref-list-end ($/) { make $<names-list>.made }
     method columns-ref:<dot> ($/) { make [$<name>.made] }
-    method columns-ref:<list> ($/) { make $<names-list>.made }
+    method columns-ref:<list> ($/) { make $<columns-ref-list-end>.made }
     method table-columns-ref ($/) {
         make {
             table   => $<table>.made,
