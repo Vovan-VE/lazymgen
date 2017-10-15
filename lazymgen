@@ -468,22 +468,6 @@ class Migration {
     has Statement:D $.up     is required;
     has Statement:D $.down   is required;
 
-    method BUILDALL(|) {
-        @!header.unshift(
-            "Generated with $PROJECT_NAME",
-        );
-
-        callsame;
-
-        @!header.push(
-            "",
-            "Source:",
-            "    {$!source.trim}",
-        );
-
-        self;
-    }
-
     multi method gist(Migration: --> Str) {
         '$> ' ~ self.up.name ~ "\n" ~
         @!header.map({
@@ -499,13 +483,23 @@ class Migration {
     }
 }
 
-role TransformFormat {
+class TransformFormat {
     # Export matched statement to complete migration code
-    method make-migration(Match:D $s --> Migration) {
-        Migration.new(
+    method make-migration(Match:D $s, :@header --> Migration) {
+        self.migration-class.new(
             source => $s,
+            header => (|@header, |self.init-header($s)),
             up     => self.statement($s),
             down   => self.statement($s, :back),
+        );
+    }
+
+    method migration-class(--> Migration:U) { Migration }
+
+    method init-header(Match:D $source) {
+        (
+            "Source:",
+            "    {$source.Str.trim}",
         );
     }
 
@@ -607,11 +601,11 @@ role TransformFormat {
     }
 }
 
-role MigrationExporter {
+class MigrationExporter {
     method export(Migration:D $migration --> Bool) { ... }
 }
 
-class DebugExporter does MigrationExporter {
+class DebugExporter is MigrationExporter {
     has IO::Handle $!to = $*OUT;
 
     method export(Migration:D $migration --> Bool) {
@@ -630,16 +624,9 @@ class Yii2Statement is Statement {
 
 class Yii2Migration is Migration {
     has Str:D $.indent = '';
-
-    method BUILDALL(|) {
-        self.header.unshift("Format: Yii2");
-
-        callsame;
-        self;
-    }
 }
 
-class Yii2Format does TransformFormat {
+class Yii2Format is TransformFormat {
     my constant UNSIGNED         = '->unsigned()';
     my constant MAX_INDEX_LENGTH = 64;
 
@@ -680,16 +667,18 @@ class Yii2Format does TransformFormat {
     my constant S_PK = 'pk';
     my constant S_IDX = 'idx';
 
-    method data-types(--> Iterable) {
-        %types.keys;
+    method migration-class(--> Migration:U) { Yii2Migration }
+
+    method init-header(Match:D $source) {
+        (
+            "Format: Yii2",
+            "",
+            |callsame,
+        );
     }
 
-    method make-migration(Match:D $s --> Migration) {
-        Yii2Migration.new(
-            source => $s,
-            up     => self.statement($s),
-            down   => self.statement($s, :back),
-        );
+    method data-types(--> Iterable) {
+        %types.keys;
     }
 
     method create-table($s --> Yii2Statement) {
@@ -971,7 +960,7 @@ class Yii2Format does TransformFormat {
     }
 }
 
-class Yii2Exporter does MigrationExporter {
+class Yii2Exporter is MigrationExporter {
     has Str:D      $.indent       is required;
     has IO::Path:D $.path         is required;
     has Str:D      $.class-prefix = 'm%y%m%d_%H%M%S_';
@@ -1134,7 +1123,9 @@ sub transform(IO::Handle :$input, TransformFormat :$format, MigrationExporter :$
         my $migration;
         try {
             $migration = {
-                migration => $format.make-migration($statement),
+                migration => $format.make-migration($statement, header => (
+                    "Generated with $PROJECT_NAME",
+                )),
                 line      => $line_number,
             };
 
