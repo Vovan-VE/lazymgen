@@ -1,5 +1,3 @@
-#!/usr/bin/env perl6
-
 use v6.c;
 
 use App::Core;
@@ -7,7 +5,8 @@ use App::Parsing;
 use App::Format::Yii2;
 
 my constant $PROJECT_NAME = 'Lazy Migration Generator';
-my constant $PROJECT_VER  = '0.0.3';
+my constant $PROJECT_VER  = '0.0.4-dev';
+my constant $BIN_NAME     = 'lazymgen';
 
 my \IS_I = INIT { $*IN.t && $*OUT.t };
 
@@ -182,12 +181,12 @@ multi sub MAIN() {
 sub get-usage() {
     Q:c:to/_END/;
     Usage:
-        {$*PROGRAM-NAME}
+        {$BIN_NAME}
 
-        {$*PROGRAM-NAME} yii2 [<options>]
-        {$*PROGRAM-NAME} yii2 list-types
+        {$BIN_NAME} yii2 [<options>]
+        {$BIN_NAME} yii2 list-types
 
-        {$*PROGRAM-NAME} man
+        {$BIN_NAME} man
     _END
 }
 
