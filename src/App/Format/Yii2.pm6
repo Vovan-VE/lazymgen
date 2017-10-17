@@ -3,7 +3,6 @@ unit module App::Format::Yii2;
 use App::Core;
 use App::Parsing;
 
-#e
 class Yii2Statement is Statement is export {
     method filter-name(Str:D $name --> Str:D) {
         $name
@@ -13,12 +12,10 @@ class Yii2Statement is Statement is export {
     }
 }
 
-#e
 class Yii2Migration is Migration is export {
     has Str:D $.indent = '';
 }
 
-#e
 class Yii2Format is TransformFormat is export {
     my constant UNSIGNED         = '->unsigned()';
     my constant MAX_INDEX_LENGTH = 64;
@@ -353,7 +350,6 @@ class Yii2Format is TransformFormat is export {
     }
 }
 
-#e
 class Yii2Exporter is MigrationExporter is export {
     has Str:D      $.indent       is required;
     has            $.path         is required;

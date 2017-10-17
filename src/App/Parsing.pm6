@@ -2,7 +2,6 @@ unit module App::Parsing;
 
 use App::Core;
 
-#e
 class X::App::MatchFail is X::AdHoc is export {}
 class X::App::Unsupported is X::App::Runtime {}
 
@@ -178,18 +177,14 @@ grammar MigrationSource {
     }
 }
 
-#e
 my constant POS_FIRST is export = 'first';
 my constant POS_AFTER is export = 'after';
 
 my constant ALTER_NAME = 'name';
 my constant ALTER_TYPE = 'type';
 
-#e
 my constant FK_RESTRICT is export = 'restrict';
-#e
 my constant FK_CASCADE  is export = 'cascade';
-#e
 my constant FK_SET_NULL is export = 'set-null';
 
 my constant ST_CREATE_TABLE = 'create-table';
@@ -433,12 +428,10 @@ class MigrationSourceActions {
     method TOP ($/) { make $<statement-start>.made }
 }
 
-#e
 sub parse-statement(Str:D $line) is export {
     MigrationSource.parse($line, actions => MigrationSourceActions)
 }
 
-#e
 class Statement is export {
     has Str:D  $.name   = '';
     has Str:D  $.code   = '';
@@ -457,7 +450,6 @@ class Statement is export {
     method filter-name(Str:D $name --> Str:D) { $name }
 }
 
-#e
 class Migration is export {
     has Match:D     $.source is required;
     has Str:D       @.header;
@@ -479,7 +471,6 @@ class Migration is export {
     }
 }
 
-#e
 class TransformFormat is export {
     # Export matched statement to complete migration code
     method make-migration(Match:D $s, :@header --> Migration) {
@@ -598,7 +589,6 @@ class TransformFormat is export {
     }
 }
 
-#e
 class MigrationExporter is export {
     method export(Migration:D $migration --> Bool) { ... }
 }
