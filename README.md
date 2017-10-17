@@ -29,10 +29,23 @@ syntax full of stupit abbreviations/shortcuts. Feed the script to `lazymgen` and
 it will generate migrations.
 
 
-Usage
+Install
 -----
 
+Currently there is no automated installation.
+
+*   Directories `bin/` and sibling `src/` must be in the same parent directory.
+*   File `bin/lazymgen` either must be available in `$PATH` directly or you can
+    just make a symlink to it from any `$PATH` location.
+
 Project requires [Perl 6][perl6] (6.c) interpretter available in `$PATH`.
+
+If you are using [Rakudo][] and `src/` is not writeable mostly, make sure to run
+`lazymgen` once by provileged user to let Rakudo to write precompiled cache (it
+should appear under `src/`).
+
+Usage
+-----
 
 Input script will be read from input.
 
@@ -48,13 +61,16 @@ $ lazymgen --path=path/to/migrations yii2 < examples/01-all.txt
 
 # See short usage hints
 $ lazymgen --help
+
+# More detailed help
+$ lazymgen man
 ```
 
 
 Script syntax
 -------------
 
-See [docs](./docs/syntax.md).
+See [docs][].
 
 
 Formats
@@ -69,19 +85,13 @@ Currently there are still some limitations to be expanded.
 Examples
 --------
 
-See [examples](./examples/).
+See [examples][].
 
 
 Testing
 -------
 
-To run tests first [IO Tester][] is required. Just run it in project directory.
-
-```sh
-$ iotester
-```
-
-If IO Tester is not available in $PATH, use one from Git submodule:
+Tests are covered by [IO Tester][]. One is available as a Git submodule.
 
 ```sh
 $ git submodule update --init
@@ -95,6 +105,9 @@ License
 This project is under [MIT License][mit].
 
 
+[docs]: docs/syntax.md
+[examples]: examples/
+[IO Tester]: https://github.com/Vovan-VE/iotester
 [mit]: https://opensource.org/licenses/MIT
 [perl6]: https://perl6.org/
-[IO Tester]: https://github.com/Vovan-VE/iotester
+[Rakudo]: http://rakudo.org/
