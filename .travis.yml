@@ -8,6 +8,7 @@ sudo: false
 branches:
   only:
     - master
+    - devel
 
 script:
   - vendor/iotester/bin/iotester -p
