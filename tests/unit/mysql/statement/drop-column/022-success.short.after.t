@@ -15,6 +15,5 @@ $> drop_table-name_column-name
         `add_table-name_column-name` is-dml=False ⟨
             ALTER TABLE `table-name`
                 ADD COLUMN `column-name` INT NOT NULL AFTER `another-column`;
-
         ⟩
 .

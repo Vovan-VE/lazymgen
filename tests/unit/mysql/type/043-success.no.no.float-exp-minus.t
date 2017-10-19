@@ -11,7 +11,6 @@ $> add_table_foo
         `add_table_foo` is-dml=False ⟨
             ALTER TABLE `table`
                 ADD COLUMN `foo` DOUBLE NOT NULL DEFAULT 42e-3;
-
         ⟩
     DOWN:
         `drop_table_foo` is-dml=False ⟨

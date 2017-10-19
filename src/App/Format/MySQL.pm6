@@ -68,7 +68,7 @@ class MySQL-Format is TransformFormat is export {
                 (
                     'ADD COLUMN ' ~ self.name($column) ~ ' ' ~
                     self.column-type-pos($type, $pos)
-                ).indent(4) ~ ";\n"
+                ).indent(4) ~ ';'
             )
         );
     }

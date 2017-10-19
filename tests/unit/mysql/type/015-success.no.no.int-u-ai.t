@@ -1,16 +1,16 @@
 ---- IN ----
-+ %table . foo : varchar = 'foo\'\\bar'
++ %table . foo : int-u-ai
 ---- OUT ----
 $> add_table_foo
     > Generated with Lazy Migration Generator
     > Format: MySQL
     >
     > Source:
-    >     + %table . foo : varchar = 'foo\'\\bar'
+    >     + %table . foo : int-u-ai
     UP:
         `add_table_foo` is-dml=False ⟨
             ALTER TABLE `table`
-                ADD COLUMN `foo` VARCHAR NOT NULL DEFAULT 'foo\'\\bar';
+                ADD COLUMN `foo` INT UNSIGNED NOT NULL AUTO_INCREMENT;
         ⟩
     DOWN:
         `drop_table_foo` is-dml=False ⟨

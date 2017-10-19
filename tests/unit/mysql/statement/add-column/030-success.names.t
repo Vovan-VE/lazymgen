@@ -11,7 +11,6 @@ $> add_table_name--_is_--strange_new--column_name
         `add_table_name--_is_--strange_new--column_name` is-dml=False ⟨
             ALTER TABLE `table@name--+is|--strange`
                 ADD COLUMN `#~new--column$name*` INTEGER NOT NULL;
-
         ⟩
     DOWN:
         `drop_table_name--_is_--strange_new--column_name` is-dml=False ⟨
