@@ -232,29 +232,43 @@ class Yii2Format is TransformFormat is export {
     method alter-column-name($s, Bool:D :$back = False --> Yii2Statement) {
         my ($table, $from_name, $to_name) = $s<table name to>;
         ($from_name, $to_name) = $to_name, $from_name if $back;
+        self!rename-column($table, $from_name, $to_name);
+    }
+    method alter-column-type($s, Bool:D :$back = False --> Yii2Statement) {
+        my ($table, $from-name, $from-type, $to-name, $to-type) = $s<table name from to-name to-type>;
+
+        if $to-type.defined && $from-type !eqv $to-type {
+            if $to-name && $from-name ne $to-name {
+                self.throw-unsupported('Yii2 cannot change column name and type in one operation');
+            }
+
+            my ($type, $pos) = ($back ?? $from-type !! $to-type)<type position>;
+            Yii2Statement.new(
+                :name("alter_{$table}_{$from-name}"),
+                :code(
+                    '$this->alterColumn(' ~ "\n" ~
+                    (
+                        self.table-string($table) ~ ",\n" ~
+                        self.string($from-name) ~ ",\n" ~
+                        self.column-type-pos($type, $pos)
+                    ).indent(4) ~ "\n" ~
+                    ');'
+                )
+            );
+        }
+        else {
+            ($from-name, $to-name) = $to-name, $from-name if $back;
+            self!rename-column($table, $from-name, $to-name);
+        }
+    }
+    method !rename-column(Str:D $table, Str:D $from-name, Str:D $to-name --> Yii2Statement) {
         Yii2Statement.new(
-            :name("rename_{$table}_{$from_name}_{$to_name}"),
+            :name("rename_{$table}_{$from-name}_{$to-name}"),
             :code(
                 '$this->renameColumn(' ~
                 self.table-string($table) ~ ', ' ~
-                self.string($from_name) ~ ', ' ~
-                self.string($to_name) ~ ');'
-            )
-        );
-    }
-    method alter-column-type($s, Bool:D :$back = False --> Yii2Statement) {
-        my ($table, $name) = $s<table name>;
-        my ($type, $pos) = ($back ?? $s<from> !! $s<to>)<type position>;
-        Yii2Statement.new(
-            :name("alter_{$table}_$name"),
-            :code(
-                '$this->alterColumn(' ~ "\n" ~
-                (
-                    self.table-string($table) ~ ",\n" ~
-                    self.string($name) ~ ",\n" ~
-                    self.column-type-pos($type, $pos)
-                ).indent(4) ~ "\n" ~
-                ');'
+                self.string($from-name) ~ ', ' ~
+                self.string($to-name) ~ ');'
             )
         );
     }

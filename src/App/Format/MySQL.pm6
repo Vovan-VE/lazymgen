@@ -174,32 +174,44 @@ class MySQL-Format is TransformFormat is export {
     }
 
     method alter-column-name($s, Bool:D :$back = False --> MySQL-Statement) {
-        my ($table, $from_name, $to_name) = $s<table name to>;
-        ($from_name, $to_name) = $to_name, $from_name if $back;
-        MySQL-Statement.new(
-            :name("rename_{$table}_{$from_name}_{$to_name}"),
-            :code(
-                'ALTER TABLE ' ~ self.name($table) ~ "\n" ~
-                (
-                    'CHANGE COLUMN ' ~ self.name($from_name) ~ ' ' ~
-                    self.name($to_name) ~ ' /* same type definition here */;'
-                ).indent(4)
-            )
-        );
+        self.throw-unsupported('MySQL cannot rename column without its type');
     }
     method alter-column-type($s, Bool:D :$back = False --> MySQL-Statement) {
-        my ($table, $name) = $s<table name>;
-        my ($type, $pos) = ($back ?? $s<from> !! $s<to>)<type position>;
-        MySQL-Statement.new(
-            :name("alter_{$table}_$name"),
-            :code(
-                'ALTER TABLE ' ~ self.name($table) ~ "\n" ~
-                (
-                    'CHANGE COLUMN ' ~ self.name($name) ~ ' ' ~
-                    self.name($name) ~ ' ' ~ self.column-type-pos($type, $pos)
-                ).indent(4) ~ ';'
-            )
-        );
+        my ($table, $from-name, $from-type, $to-name, $to-type) = $s<table name from to-name to-type>;
+
+        if $to-type.defined && $from-type !eqv $to-type {
+            $to-name //= $from-name;
+            ($from-name, $to-name) = $to-name, $from-name if $back;
+            my ($type, $pos) = ($back ?? $from-type !! $to-type)<type position>;
+            MySQL-Statement.new(
+                :name(
+                    "alter_{$table}_{$from-name}" ~
+                    ($from-name eq $to-name ?? '' !! "_{$to-name}")
+                ),
+                :code(
+                    'ALTER TABLE ' ~ self.name($table) ~ "\n" ~
+                    (
+                        'CHANGE COLUMN ' ~ self.name($from-name) ~ ' ' ~
+                        self.name($to-name) ~ ' ' ~ self.column-type-pos($type, $pos)
+                    ).indent(4) ~ ';'
+                )
+            );
+        }
+        else {
+            ($from-name, $to-name) = $to-name, $from-name if $back;
+            my ($type, $pos) = $from-type<type position>;
+            MySQL-Statement.new(
+                :name("rename_{$table}_{$from-name}_{$to-name}"),
+                :code(
+                    'ALTER TABLE ' ~ self.name($table) ~ "\n" ~
+                    (
+                        'CHANGE COLUMN ' ~ self.name($from-name) ~ ' ' ~
+                        self.name($to-name) ~ ' ' ~
+                        self.column-type-pos($type, $pos) ~ ';'
+                    ).indent(4)
+                )
+            );
+        }
     }
 
     method data-statement($s, Bool:D :$back = False --> MySQL-Statement) {

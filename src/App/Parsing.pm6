@@ -60,9 +60,12 @@ grammar MigrationSource {
     token table { '%' ~ <name> <?> }
 
     rule alter-column-type-to { <alter-column-type> ~ '=>' <?> }
+    proto rule alter-column-type-new {*}
+    rule alter-column-type-new:sym<full> { <name> <alter-column-type>? }
+    rule alter-column-type-new:sym<type> { <alter-column-type> }
     proto rule alter-column-spec {*}
     rule alter-column-spec:sym<name> { '=>' ~ <name> <?> }
-    rule alter-column-spec:sym<type> { <alter-column-type-to> ~ <alter-column-type> <?> }
+    rule alter-column-spec:sym<type> { <alter-column-type-to> ~ <alter-column-type-new> <?> }
     rule alter-column { <name> ~ <alter-column-spec> <?> }
     rule rename-table { '=>' ~ <table> <?> }
 
@@ -134,6 +137,7 @@ grammar MigrationSource {
         alter-column            => '<name>',
         alter-column-spec       => '`:` or `=>`',
         alter-column-type       => '`:`',
+        alter-column-type-new   => '<name> or `:`',
         alter-statement-body    => '<table>',
         alter-statement-spec    => '`.` or `=>`',
         columns-definitions-end => '<name>',
@@ -272,6 +276,17 @@ class MigrationSourceActions {
     method table ($/) { make $<name>.made }
 
     method alter-column-type-to ($/) { make $<alter-column-type>.made }
+    method alter-column-type-new:sym<full> ($/) {
+        make {
+            name => $<name>.made,
+            type => $<alter-column-type>.made,
+        }
+    }
+    method alter-column-type-new:sym<type> ($/) {
+        make {
+            type => $<alter-column-type>.made,
+        }
+    }
     method alter-column-spec:sym<name> ($/) {
         make {
             alt => ALTER_NAME,
@@ -279,10 +294,12 @@ class MigrationSourceActions {
         };
     }
     method alter-column-spec:sym<type> ($/) {
+        my ($to-name, $to-type) = $<alter-column-type-new>.made<name type>;
         make {
             alt  => ALTER_TYPE,
             from => $<alter-column-type-to>.made,
-            to   => $<alter-column-type>.made,
+            to-name => $to-name,
+            to-type => $to-type,
         };
     }
     method alter-column ($/) {
