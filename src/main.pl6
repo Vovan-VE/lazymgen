@@ -2,6 +2,7 @@ use v6.c;
 
 use App::Core;
 use App::Parsing;
+use App::Format::MySQL;
 use App::Format::Yii2;
 
 my constant $PROJECT_NAME = 'Lazy Migration Generator';
@@ -49,7 +50,7 @@ sub transform(:$input, TransformFormat :$format, MigrationExporter :$exporter) {
             $statement = parse-statement($line);
 
             CATCH {
-                when X::App::MatchFail {
+                when X::MatchFail {
                     if IS_I {
                         put "Syntax: $_";
                         # next;
@@ -59,7 +60,7 @@ sub transform(:$input, TransformFormat :$format, MigrationExporter :$exporter) {
                         abort "syntax: $_ - at line $line_number";
                     }
                 }
-                when X::App::Runtime {
+                when X::Runtime {
                     if IS_I {
                         put "{.^name}: $_";
                         # next;
@@ -92,7 +93,7 @@ sub transform(:$input, TransformFormat :$format, MigrationExporter :$exporter) {
             };
 
             CATCH {
-                when X::App::Runtime {
+                when X::Runtime {
                     if IS_I {
                         put "{.^name}: $_";
                         # next;
@@ -110,7 +111,7 @@ sub transform(:$input, TransformFormat :$format, MigrationExporter :$exporter) {
             try {
                 $exporter.export($migration<migration>);
                 CATCH {
-                    when X::App::Runtime {
+                    when X::Runtime {
                         put "{.^name}: $_";
                         # next;
                         # nothing to skip
@@ -127,13 +128,16 @@ sub transform(:$input, TransformFormat :$format, MigrationExporter :$exporter) {
         try {
             $exporter.export($item<migration>);
             CATCH {
-                when X::App::Runtime {
+                when X::Runtime {
                     abort "{.^name}: $_ - at line $item<line>";
                 }
             }
         }
     }
 }
+
+my constant CODE_MYSQL = 'mysql';
+my constant CODE_YII2  = 'yii2';
 
 my constant DEFAULT_INDENT = ' ' x 4;
 
@@ -170,10 +174,19 @@ multi sub MAIN('yii2',
     );
 }
 
-multi sub MAIN() {
+multi sub MAIN(
+    Str:D :$code = CODE_YII2,
+) {
+    my %formats = (
+        (CODE_MYSQL) => MySQL-Format,
+        (CODE_YII2)  => Yii2Format,
+    );
+
+    %formats{$code}:exists  or abort("unknown code format '$code'");
+
     transform(
         input    => $*IN,
-        format   => Yii2Format.new,
+        format   => %formats{$code}.new,
         exporter => DebugExporter.new,
     );
 }
@@ -181,7 +194,7 @@ multi sub MAIN() {
 sub get-usage() {
     Q:c:to/_END/;
     Usage:
-        {$BIN_NAME}
+        {$BIN_NAME} [<options>]
 
         {$BIN_NAME} yii2 [<options>]
         {$BIN_NAME} yii2 list-types
@@ -205,6 +218,10 @@ multi sub MAIN('man') {
         `yii2` subset toggles Yii2 migrations to be generated into given directory.
 
     Options
+        **default**
+
+        --code=<type>
+            Code type. Either 'mysql' or 'yii2'.
 
         **yii2**
 

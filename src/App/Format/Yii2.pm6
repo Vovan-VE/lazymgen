@@ -18,7 +18,6 @@ class Yii2Migration is Migration is export {
 
 class Yii2Format is TransformFormat is export {
     my constant UNSIGNED         = '->unsigned()';
-    my constant MAX_INDEX_LENGTH = 64;
 
     my constant %types = {
         primary      => {:t<primaryKey>,    :D},
@@ -216,33 +215,6 @@ class Yii2Format is TransformFormat is export {
             )
         );
     }
-    method index-name(Str $prefix, $alias, *@table-col-refs --> Str) {
-        with $alias {
-            .return if .chars <= MAX_INDEX_LENGTH;
-            self.throw-unsupported("too long index name given with alias");
-        }
-
-        my @tables;
-        my @columns;
-        # note @table-col-refs;
-        for @table-col-refs {
-            # $*ERR.say($(:TABLE($_<table>), :COLUMNS($_<columns>)));
-            push |.list for @tables, @columns Z $_<table>, $_<columns>;
-        }
-        # note $(:@tables, :@columns);
-        # note $(:@tables, :@columns).perl;
-
-        my @refs = (@tables Z @columns».list).flat;
-        # note $(@refs).perl;
-
-        while @refs {
-            with ($prefix, @refs).flat.join('-') {
-                .return if .chars <= MAX_INDEX_LENGTH;
-            }
-            @refs.pop;
-        }
-        self.throw-unsupported("too long index name in any case");
-    }
 
     method rename-table($s, Bool:D :$back = False --> Yii2Statement) {
         my ($from_table, $to_table) = $s<table to>;
@@ -439,7 +411,7 @@ class Yii2Exporter is MigrationExporter is export {
         }
 
         $filename.spurt($code, :createonly)
-            or X::App::IO.new(pyload => "cannot create file - `$filename`");
+            or X::IO.new(pyload => "cannot create file - `$filename`");
         put "* $rel-file";
 
         $!time.=later(:5second);

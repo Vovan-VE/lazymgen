@@ -2,8 +2,8 @@ unit module App::Parsing;
 
 use App::Core;
 
-class X::App::MatchFail is X::AdHoc is export {}
-class X::App::Unsupported is X::App::Runtime {}
+class X::MatchFail is X::AdHoc is export {}
+class X::Unsupported is X::Runtime {}
 
 grammar MigrationSource {
     token ws { <!ww> \h* }
@@ -171,7 +171,7 @@ grammar MigrationSource {
                 ~ (self.pos < self.target.chars - CONTEXT ?? '...' !! '')
                 ~ '`'
             !! 'instead of EOL';
-        die X::App::MatchFail.new(
+        die X::MatchFail.new(
             payload => "expected {$expected}{$after} {$near} at position {self.pos}"
         );
     }
@@ -559,6 +559,35 @@ class TransformFormat is export {
         }
     }
 
+    method max-index-length(--> Int) { 64 }
+    method index-name(Str $prefix, $alias, *@table-col-refs --> Str) {
+        with $alias {
+            .return if .chars <= self.max-index-length;
+            self.throw-unsupported("too long index name given with alias");
+        }
+
+        my @tables;
+        my @columns;
+        # note @table-col-refs;
+        for @table-col-refs {
+            # $*ERR.say($(:TABLE($_<table>), :COLUMNS($_<columns>)));
+            push |.list for @tables, @columns Z $_<table>, $_<columns>;
+        }
+        # note $(:@tables, :@columns);
+        # note $(:@tables, :@columns).perl;
+
+        my @refs = (@tables Z @columns».list).flat;
+        # note $(@refs).perl;
+
+        while @refs {
+            with ($prefix, @refs).flat.join('-') {
+                .return if .chars <= self.max-index-length;
+            }
+            @refs.pop;
+        }
+        self.throw-unsupported("too long index name in any case");
+    }
+
     method default-value($value --> Str) {
         given $value {
             when Bool {
@@ -585,7 +614,7 @@ class TransformFormat is export {
     method null-value(--> Str) { 'NULL' }
 
     method throw-unsupported(Str:D $message) {
-        die X::App::Unsupported.new(payload => $message);
+        die X::Unsupported.new(payload => $message);
     }
 }
 
