@@ -6,7 +6,7 @@ use App::Format::MySQL;
 use App::Format::Yii2;
 
 my constant $PROJECT_NAME = 'Lazy Migration Generator';
-my constant $PROJECT_VER  = '0.1.0-dev';
+my constant $PROJECT_VER  = '0.1.0';
 my constant $BIN_NAME     = 'lazymgen';
 
 my \IS_I = INIT { $*IN.t && $*OUT.t };
