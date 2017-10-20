@@ -4,8 +4,8 @@ Script Syntax
 One **statement** goes in separate line. Whitespaces are ignored. Empty lines
 are ignored.
 
-Currently there is no support for **comments** as it not needed. Script is for
-one use mostly.
+**Comment** lines are started with `#`. Comment can only occupy a whole line
+ignoring leading whitespaces.
 
 **Identifiers** are used for table, columns and data type names. Identifiers are
 very close to CSS identifiers. It may contain latin letters, digits, underscores
@@ -180,18 +180,19 @@ Mostly everithing is familar for you. New here are:
 Input code | Description
 ---------- | -----------
 `=>` | Separate child and parent tables and columns
-`~!` | Optional. ON DELETE RESTRICT
-`~>` | Optional. ON DELETE CASCADE
-`~?` | Optional. ON DELETE SET NULL
-`*!` | Optional. ON UPDATE RESTRICT
-`*>` | Optional. ON UPDATE CASCADE
-`*?` | Optional. ON UPDATE SET NULL
+
+Also here are optional phases actions:
+
+.           | `RESTRICT` | `CASCADE` | `SET NULL`
+----------- | ---------- | --------- | ----------
+`ON DELETE` | `~!`       | `~>`      | `~?`
+`ON UPDATE` | `*!`       | `*>`      | `*?`
 
 _Note:_ Single column syntax `. column` and `( column )` means the same thing
 and does not require to be the same style on the both sides of `=>`.
 
 _Note:_ ON DELETE and ON UPDATE both are optional independently and can appear
-in any order. In case of absens it means RESTRICT.
+in any order. In case of absens it means `RESTRICT`.
 
 #### DROP FOREIGN KEY
 
@@ -216,19 +217,39 @@ Nothing special here but ALTER sign `*` in front.
 #### RENAME COLUMN
 
 ```
-* %table . old-column-name => new-column-name
+* %table . old-name => new-name
 ```
 
 #### CHANGE COLUMN
 
+Change both name and type
+
 ```
-* %table . column :old-type => :new-type
+* %table . old-name :old-type ^ => new-name :new-type > bar
+```
+
+Change name, keep same type
+
+```
+* %table . old-name :type ^ => new-name
+```
+
+Change type, keep same name
+
+```
+* %table . column :old-type            => :new-type
 * %table . column :old-type(42)? = 0 ^ => :new-type(37)? = 1 > bar
 ```
 
 Both old and new column types are the same as in ADD COLUMN statement, t.i.
 with optional parameters, NULL-able sign, default value and placement part
 (first or after).
+
+When changing both name and type, if both types and positions are exactly the
+same, the statement means column rename.
+
+Changing name keeping type is usefull i.e. for MySQL which cannot just rename
+column without its type.
 
 #### DML stub
 
