@@ -41,7 +41,7 @@ Currently there is no automated installation.
 Project requires [Perl 6][perl6] (6.c) interpretter available in `$PATH`.
 
 If you are using [Rakudo][] and `src/` is not writeable mostly, make sure to run
-`lazymgen` once by provileged user to let Rakudo to write precompiled cache (it
+`lazymgen` once by privileged user to let Rakudo to write precompiled cache (it
 should appear under `src/`).
 
 Usage
@@ -78,14 +78,14 @@ Formats
 
 Currently there are still some limitations to be expanded.
 
-*   Only Yii2 format is supported to generate statements code.
+*   Only Yii2 and MySQL format is supported to generate statements code.
 *   Result can be either Yii2 migrations files or debug to STDOUT.
 
 
 Examples
 --------
 
-See [examples][].
+See [examples][]. See also [tests][] as examples too.
 
 
 Testing
@@ -111,3 +111,4 @@ This project is under [MIT License][mit].
 [mit]: https://opensource.org/licenses/MIT
 [perl6]: https://perl6.org/
 [Rakudo]: http://rakudo.org/
+[tests]: tests/unit/
