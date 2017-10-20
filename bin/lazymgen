@@ -1,0 +1,20 @@
+#!/bin/bash
+
+SELF="${BASH_SOURCE[0]}"
+
+if [ -L "$SELF" ]; then
+    if ! SELF="$(readlink -e "$SELF")"; then
+        echo "$(basename "$0"): cannot find link target for '$0'" >&2
+        exit 2
+    fi
+fi
+
+THIS_DIR="$(cd "$(dirname "$SELF")"; pwd)"
+SRC_DIR="$(dirname "$THIS_DIR")/src"
+
+if ! PERL6_BIN="$(which perl6)"; then
+    echo "$(basename "$0"): cannot locate 'perl6'" >&2
+    exit 2
+fi
+
+"$PERL6_BIN" -I "$SRC_DIR" -- "$SRC_DIR/main.pl6" "$@"
