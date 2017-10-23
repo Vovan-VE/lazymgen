@@ -105,7 +105,7 @@ License
 This project is under [MIT License][mit].
 
 
-[docs]: docs/syntax.md
+[docs]: docs/README.md
 [examples]: examples/
 [IO Tester]: https://github.com/Vovan-VE/iotester
 [mit]: https://opensource.org/licenses/MIT
