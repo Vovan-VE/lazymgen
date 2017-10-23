@@ -18,7 +18,7 @@ Tag  | Description
 `ai` | Adds `AUTO_INCREMENT`
 `pk` | Adds `PRIMARY KEY`
 
-Exxamples:
+Examples:
 
 Code | Result
 ---- | ------
