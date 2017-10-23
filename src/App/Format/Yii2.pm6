@@ -237,7 +237,7 @@ class Yii2Format is TransformFormat is export {
     method alter-column-type($s, Bool:D :$back = False --> Yii2Statement) {
         my ($table, $from-name, $from-type, $to-name, $to-type) = $s<table name from to-name to-type>;
 
-        if $to-type.defined && $from-type !eqv $to-type {
+        if !$to-name || $to-type.defined && $from-type !eqv $to-type {
             if $to-name && $from-name ne $to-name {
                 self.throw-unsupported('Yii2 cannot change column name and type in one operation');
             }

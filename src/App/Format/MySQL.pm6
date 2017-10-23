@@ -179,7 +179,7 @@ class MySQL-Format is TransformFormat is export {
     method alter-column-type($s, Bool:D :$back = False --> MySQL-Statement) {
         my ($table, $from-name, $from-type, $to-name, $to-type) = $s<table name from to-name to-type>;
 
-        if $to-type.defined && $from-type !eqv $to-type {
+        if !$to-name || $to-type.defined && $from-type !eqv $to-type {
             $to-name //= $from-name;
             ($from-name, $to-name) = $to-name, $from-name if $back;
             my ($type, $pos) = ($back ?? $from-type !! $to-type)<type position>;
