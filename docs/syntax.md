@@ -169,7 +169,7 @@ Default key name prefixed with `idx`.
 
 ```
 + FK %child-table . foo         => %parent-table . foo
-+ FK %child-table . foo         => %parent-table . foo     ~! *~
++ FK %child-table . foo         => %parent-table . foo     ~! *!
 + FK %child-table ( foo )       => %parent-table ( foo )   ~> *>
 + FK %child-table ( foo , bar ) => %parent-table ( a , b ) ~? *?
 + FK @key-name %child-table . ref-column => %parent-table . column
@@ -200,7 +200,7 @@ Same is ADD FOREIGN KEY but with `-` instear of `+`.
 
 ```
 - FK %child-table . foo         => %parent-table . foo
-- FK %child-table . foo         => %parent-table . foo     ~! *~
+- FK %child-table . foo         => %parent-table . foo     ~! *!
 - FK %child-table ( foo )       => %parent-table ( foo )   ~> *>
 - FK %child-table ( foo , bar ) => %parent-table ( a , b ) ~? *?
 - FK @key-name %child-table . ref-column => %parent-table . column
