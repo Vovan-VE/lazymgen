@@ -43,6 +43,7 @@ class Yii2Format is TransformFormat is export {
         timestamp    => True,
         binary       => True,
         bool         => 'boolean',
+        boolean      => True,
         money        => True,
     };
 

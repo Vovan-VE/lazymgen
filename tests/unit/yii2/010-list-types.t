@@ -3,6 +3,7 @@
 bigint
 binary
 bool
+boolean
 char
 date
 datetime
