@@ -3,8 +3,8 @@ sudo: false
 language: perl6
 perl6:
   - latest
-  - '2017.07'
   - '2017.10'
+  - '2018.04'
 
 matrix:
   fast_finish: true
