@@ -43,6 +43,7 @@ class Yii2Format is TransformFormat is export {
         timestamp    => True,
         binary       => True,
         bool         => 'boolean',
+        boolean      => True,
         money        => True,
     };
 
@@ -401,7 +402,7 @@ class Yii2Exporter is MigrationExporter is export {
 
         my $body = '';
 
-        $body ~= "// $_".trim ~ "\n"    for @header.map({ .subst(/<?after '?'><?before '>'>/, '[⋯]', :g) });
+        $body ~= "// $_".trim ~ "\n"    for @header.map({ .subst(/<?after '?'><?before '>'>/, ' ', :g) });
         $body ~= "\n"                   if  @header.elems;
 
         $body ~=
