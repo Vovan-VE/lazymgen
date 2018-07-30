@@ -13,7 +13,7 @@ $> create_table-name
                 `id` BIGINTEGER UNSIGNED PRIMARY KEY,
                 `name` VARCHAR NOT NULL,
                 `mail` VARCHAR(255) NOT NULL
-            ) CHARACTER SET utf8 COLLATE utf8_unicode_ci ENGINE=InnoDB;
+            ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci ENGINE=InnoDB;
         ⟩
     DOWN:
         `drop_table-name` is-dml=False ⟨

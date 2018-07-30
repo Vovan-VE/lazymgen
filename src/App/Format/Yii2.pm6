@@ -80,7 +80,7 @@ class Yii2Format is TransformFormat is export {
                 q[if ($this->db->driverName === 'mysql') {] ~ "\n" ~
                 (
                     '// https://stackoverflow.com/q/766809' ~ "\n" ~
-                    q[$tableOptions = 'CHARACTER SET utf8 COLLATE utf8_unicode_ci ENGINE=InnoDB';]
+                    q[$tableOptions = 'CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci ENGINE=InnoDB';]
                 ).indent(4) ~ "\n" ~
                 "}\n" ~
                 "\n" ~
