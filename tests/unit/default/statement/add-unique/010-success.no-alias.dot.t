@@ -2,7 +2,7 @@
 + U %table-name . column-name
 ---- OUT ----
 $> add_idx_table_name_column_name
-    > Generated with Lazy Migration Generator
+    > Generated with lazymgen - Lazy Migration Generator
     > Format: Yii2
     >
     > Source:

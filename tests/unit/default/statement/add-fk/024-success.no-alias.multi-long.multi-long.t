@@ -2,7 +2,7 @@
 + FK %child-table-long ( foo-long , bar , lol ) => %parent-long ( lorem-long , ipsum-long , dolor-long )
 ---- OUT ----
 $> add_fk_child_table_long_foo_long_bar_lol_parent_long_lorem_long
-    > Generated with Lazy Migration Generator
+    > Generated with lazymgen - Lazy Migration Generator
     > Format: Yii2
     >
     > Source:

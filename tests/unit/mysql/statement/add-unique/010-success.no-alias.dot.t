@@ -2,7 +2,7 @@
 + U %table-name . column-name
 ---- OUT ----
 $> add_idx-table-name-column-name
-    > Generated with Lazy Migration Generator
+    > Generated with lazymgen - Lazy Migration Generator
     > Format: MySQL
     >
     > Source:

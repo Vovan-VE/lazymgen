@@ -2,7 +2,7 @@
 =
 ---- OUT ----
 $> update
-    > Generated with Lazy Migration Generator
+    > Generated with lazymgen - Lazy Migration Generator
     > Format: Yii2
     >
     > Source:

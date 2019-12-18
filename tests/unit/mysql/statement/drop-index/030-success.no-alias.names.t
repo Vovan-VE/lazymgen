@@ -2,7 +2,7 @@
 - I %table\@name\+is\|strange . \#\~column\$name\*
 ---- OUT ----
 $> drop_idx-table_name_is_strange-_column_name
-    > Generated with Lazy Migration Generator
+    > Generated with lazymgen - Lazy Migration Generator
     > Format: MySQL
     >
     > Source:

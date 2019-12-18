@@ -2,7 +2,7 @@
 + %table . foo : int ( 10 ) ?
 ---- OUT ----
 $> add_table_foo
-    > Generated with Lazy Migration Generator
+    > Generated with lazymgen - Lazy Migration Generator
     > Format: MySQL
     >
     > Source:

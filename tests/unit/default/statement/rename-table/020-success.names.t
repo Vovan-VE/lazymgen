@@ -2,7 +2,7 @@
 * %table\@name\+is\|strange => %\#\~table\$name\*
 ---- OUT ----
 $> rename_table_name_is_strange_table_name
-    > Generated with Lazy Migration Generator
+    > Generated with lazymgen - Lazy Migration Generator
     > Format: Yii2
     >
     > Source:

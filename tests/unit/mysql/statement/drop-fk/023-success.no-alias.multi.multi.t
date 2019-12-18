@@ -2,7 +2,7 @@
 - FK %child ( foo , bar , lol ) => %parent ( lorem , ipsum , dolor )
 ---- OUT ----
 $> drop_fk-child-foo-bar-lol-parent-lorem-ipsum-dolor
-    > Generated with Lazy Migration Generator
+    > Generated with lazymgen - Lazy Migration Generator
     > Format: MySQL
     >
     > Source:

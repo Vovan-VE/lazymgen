@@ -2,7 +2,7 @@
 + %table\@name\+is\|strange ( \#\~column\$name\* : varchar )
 ---- OUT ----
 $> create_table_name_is_strange
-    > Generated with Lazy Migration Generator
+    > Generated with lazymgen - Lazy Migration Generator
     > Format: MySQL
     >
     > Source:

@@ -2,7 +2,7 @@
 + %table . foo : int ( 10 ) ? = nULl
 ---- OUT ----
 $> add_table_foo
-    > Generated with Lazy Migration Generator
+    > Generated with lazymgen - Lazy Migration Generator
     > Format: Yii2
     >
     > Source:

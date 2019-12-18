@@ -2,7 +2,7 @@
 + %table\@name--\+is\|--strange . \#\~new--column\$name\* : integer
 ---- OUT ----
 $> add_table_name--_is_--strange_new--column_name
-    > Generated with Lazy Migration Generator
+    > Generated with lazymgen - Lazy Migration Generator
     > Format: MySQL
     >
     > Source:

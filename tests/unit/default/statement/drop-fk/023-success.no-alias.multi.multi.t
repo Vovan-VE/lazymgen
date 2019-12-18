@@ -2,7 +2,7 @@
 - FK %child ( foo , bar , lol ) => %parent ( lorem , ipsum , dolor )
 ---- OUT ----
 $> drop_fk_child_foo_bar_lol_parent_lorem_ipsum_dolor
-    > Generated with Lazy Migration Generator
+    > Generated with lazymgen - Lazy Migration Generator
     > Format: Yii2
     >
     > Source:

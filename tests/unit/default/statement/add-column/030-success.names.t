@@ -2,7 +2,7 @@
 + %table\@name--\+is\|--strange . \#\~new--column\$name\* : int
 ---- OUT ----
 $> add_table_name_is_strange_new_column_name
-    > Generated with Lazy Migration Generator
+    > Generated with lazymgen - Lazy Migration Generator
     > Format: Yii2
     >
     > Source:

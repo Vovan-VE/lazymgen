@@ -2,7 +2,7 @@
   -  %table-name  (  id  :  primary  ,  name  :  string  (  )  ,  mail  :  string  (  255  )  )
 ----OUT----
 $> drop_table_name
-    > Generated with Lazy Migration Generator
+    > Generated with lazymgen - Lazy Migration Generator
     > Format: Yii2
     >
     > Source:

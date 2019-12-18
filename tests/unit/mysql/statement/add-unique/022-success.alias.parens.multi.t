@@ -2,7 +2,7 @@
 + U @key-name %table-name ( column-foo , column-bar )
 ---- OUT ----
 $> add_key-name
-    > Generated with Lazy Migration Generator
+    > Generated with lazymgen - Lazy Migration Generator
     > Format: MySQL
     >
     > Source:

@@ -2,7 +2,7 @@
 * %table-name . column : int ( 10 ) > foo => : uint
 ---- OUT ----
 $> alter_table_name_column
-    > Generated with Lazy Migration Generator
+    > Generated with lazymgen - Lazy Migration Generator
     > Format: Yii2
     >
     > Source:

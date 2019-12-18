@@ -2,7 +2,7 @@
 - FK %table\@name\+is\|strange . \#\~column\$name\* => %\<\>\?\% . \!\(\)\[\]
 ---- OUT ----
 $> drop_fk-table_name_is_strange-_column_name_-_-
-    > Generated with Lazy Migration Generator
+    > Generated with lazymgen - Lazy Migration Generator
     > Format: MySQL
     >
     > Source:

@@ -2,7 +2,7 @@
 + %table-name . column-name : int ( 10 ) ? = 42 ^
 ---- OUT ----
 $> add_table_name_column_name
-    > Generated with Lazy Migration Generator
+    > Generated with lazymgen - Lazy Migration Generator
     > Format: Yii2
     >
     > Source:

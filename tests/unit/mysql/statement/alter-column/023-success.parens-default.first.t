@@ -2,7 +2,7 @@
 * %table-name . column : integer ( 10 ) = 42 ^ => : integer ^
 ---- OUT ----
 $> alter_table-name_column
-    > Generated with Lazy Migration Generator
+    > Generated with lazymgen - Lazy Migration Generator
     > Format: MySQL
     >
     > Source:

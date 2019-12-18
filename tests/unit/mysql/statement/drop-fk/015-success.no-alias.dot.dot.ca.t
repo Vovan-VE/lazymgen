@@ -2,7 +2,7 @@
 - FK %child . parent_id => %parent . id ~>
 ---- OUT ----
 $> drop_fk-child-parent_id-parent-id
-    > Generated with Lazy Migration Generator
+    > Generated with lazymgen - Lazy Migration Generator
     > Format: MySQL
     >
     > Source:

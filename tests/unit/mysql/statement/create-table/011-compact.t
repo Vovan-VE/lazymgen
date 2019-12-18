@@ -2,7 +2,7 @@
 +%table-name(id:biginteger-u-pk,name:varchar(),mail:varchar(255))
 ----OUT----
 $> create_table-name
-    > Generated with Lazy Migration Generator
+    > Generated with lazymgen - Lazy Migration Generator
     > Format: MySQL
     >
     > Source:

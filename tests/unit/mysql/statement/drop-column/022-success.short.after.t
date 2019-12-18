@@ -2,7 +2,7 @@
 - %table-name . column-name : int > another-column
 ---- OUT ----
 $> drop_table-name_column-name
-    > Generated with Lazy Migration Generator
+    > Generated with lazymgen - Lazy Migration Generator
     > Format: MySQL
     >
     > Source:

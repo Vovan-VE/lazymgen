@@ -20,7 +20,8 @@ class DebugExporter is MigrationExporter {
 }
 
 sub transform(:$input, TransformFormat :$format, MigrationExporter :$exporter) {
-    put "$PROJECT_NAME ver. $PROJECT_VER"   if IS_I;
+    put "$BIN_NAME ver. $PROJECT_VER"       if IS_I;
+    put "$PROJECT_NAME"                     if IS_I;
     put "Interactive mode"                  if IS_I;
     print '> '                              if IS_I;
 
@@ -87,7 +88,7 @@ sub transform(:$input, TransformFormat :$format, MigrationExporter :$exporter) {
         try {
             $migration = {
                 migration => $format.make-migration($statement, header => (
-                    "Generated with $PROJECT_NAME",
+                    "Generated with $BIN_NAME - $PROJECT_NAME",
                 )),
                 line      => $line_number,
             };

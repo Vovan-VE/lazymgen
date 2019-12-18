@@ -2,7 +2,7 @@
 - FK %child-table-long ( foo-long , bar-long , lol-long ) => %parent-long ( lorem-long , ipsum-long , dolor-long )
 ---- OUT ----
 $> drop_fk-child-table-long-foo-long-bar-long-lol-long-parent-long
-    > Generated with Lazy Migration Generator
+    > Generated with lazymgen - Lazy Migration Generator
     > Format: MySQL
     >
     > Source:
