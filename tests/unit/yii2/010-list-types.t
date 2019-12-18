@@ -16,6 +16,7 @@ int64
 money
 primary
 primary-big
+primary64
 string
 text
 time
@@ -25,3 +26,4 @@ uint16
 uint64
 uprimary
 uprimary-big
+uprimary64

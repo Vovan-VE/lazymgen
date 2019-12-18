@@ -24,6 +24,8 @@ class Yii2Format is TransformFormat is export {
         uprimary     => {:t<primaryKey>,    :D, :a(UNSIGNED)},
         primary-big  => {:t<bigPrimaryKey>, :D},
         uprimary-big => {:t<bigPrimaryKey>, :D, :a(UNSIGNED)},
+        primary64    => {:t<bigPrimaryKey>, :D},
+        uprimary64   => {:t<bigPrimaryKey>, :D, :a(UNSIGNED)},
         char         => True,
         string       => True,
         text         => True,
