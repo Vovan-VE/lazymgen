@@ -29,6 +29,8 @@ class Yii2Format is TransformFormat is export {
         char         => True,
         string       => True,
         text         => True,
+        int8         => 'tinyInteger',
+        uint8        => ['tinyInteger', UNSIGNED],
         int16        => 'smallInteger',
         uint16       => ['smallInteger', UNSIGNED],
         int          => 'integer',
