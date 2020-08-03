@@ -2,7 +2,7 @@
 +%table-name(id:biginteger-u-pk,name:varchar(),mail:varchar(255))
 ----OUT----
 $> create_table-name
-    > Generated with Lazy Migration Generator
+    > Generated with lazymgen - Lazy Migration Generator
     > Format: MySQL
     >
     > Source:
@@ -13,7 +13,7 @@ $> create_table-name
                 `id` BIGINTEGER UNSIGNED PRIMARY KEY,
                 `name` VARCHAR NOT NULL,
                 `mail` VARCHAR(255) NOT NULL
-            ) CHARACTER SET utf8 COLLATE utf8_unicode_ci ENGINE=InnoDB;
+            ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci ENGINE=InnoDB;
         ⟩
     DOWN:
         `drop_table-name` is-dml=False ⟨

@@ -2,7 +2,7 @@
 - I @key-name %table-name . column-name
 ---- OUT ----
 $> drop_key-name
-    > Generated with Lazy Migration Generator
+    > Generated with lazymgen - Lazy Migration Generator
     > Format: MySQL
     >
     > Source:

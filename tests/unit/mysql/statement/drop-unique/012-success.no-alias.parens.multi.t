@@ -2,7 +2,7 @@
 - U %table-name ( column-foo , column-bar )
 ---- OUT ----
 $> drop_idx-table-name-column-foo-column-bar
-    > Generated with Lazy Migration Generator
+    > Generated with lazymgen - Lazy Migration Generator
     > Format: MySQL
     >
     > Source:

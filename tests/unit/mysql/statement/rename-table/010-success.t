@@ -2,7 +2,7 @@
 * %old-table-name => %new-table-name
 ---- OUT ----
 $> rename_old-table-name_new-table-name
-    > Generated with Lazy Migration Generator
+    > Generated with lazymgen - Lazy Migration Generator
     > Format: MySQL
     >
     > Source:

@@ -2,7 +2,7 @@
 * %table-name . foo : integer => bar
 ---- OUT ----
 $> rename_table-name_foo_bar
-    > Generated with Lazy Migration Generator
+    > Generated with lazymgen - Lazy Migration Generator
     > Format: MySQL
     >
     > Source:

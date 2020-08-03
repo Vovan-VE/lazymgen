@@ -2,7 +2,7 @@
 - PK %table-name ( column-foo , column-bar )
 ---- OUT ----
 $> drop_pk-table-name-column-foo-column-bar
-    > Generated with Lazy Migration Generator
+    > Generated with lazymgen - Lazy Migration Generator
     > Format: MySQL
     >
     > Source:

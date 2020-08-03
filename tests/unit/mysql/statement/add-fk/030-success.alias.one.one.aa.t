@@ -2,7 +2,7 @@
 + FK @key-name %child ( parent_id ) => %parent ( id )
 ---- OUT ----
 $> add_key-name
-    > Generated with Lazy Migration Generator
+    > Generated with lazymgen - Lazy Migration Generator
     > Format: MySQL
     >
     > Source:

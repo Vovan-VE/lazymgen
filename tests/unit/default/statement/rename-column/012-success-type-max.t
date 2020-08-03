@@ -2,7 +2,7 @@
 * %table-name . old-column-name : int ( 10 ) ? = 42 > foo => new-column-name : int(10)?=42>foo
 ---- OUT ----
 $> rename_table_name_old_column_name_new_column_name
-    > Generated with Lazy Migration Generator
+    > Generated with lazymgen - Lazy Migration Generator
     > Format: Yii2
     >
     > Source:

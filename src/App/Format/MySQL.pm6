@@ -47,7 +47,7 @@ class MySQL-Format is TransformFormat is export {
                     my ($name, $type) = .<name type>;
                     self.name($name) ~ ' ' ~ self.column-type($type);
                 }).join(",\n").indent(4) ~ "\n" ~
-                ') CHARACTER SET utf8 COLLATE utf8_unicode_ci ENGINE=InnoDB;'
+                ') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci ENGINE=InnoDB;'
             ),
         );
     }

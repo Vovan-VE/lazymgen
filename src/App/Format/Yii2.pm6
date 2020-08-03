@@ -24,9 +24,13 @@ class Yii2Format is TransformFormat is export {
         uprimary     => {:t<primaryKey>,    :D, :a(UNSIGNED)},
         primary-big  => {:t<bigPrimaryKey>, :D},
         uprimary-big => {:t<bigPrimaryKey>, :D, :a(UNSIGNED)},
+        primary64    => {:t<bigPrimaryKey>, :D},
+        uprimary64   => {:t<bigPrimaryKey>, :D, :a(UNSIGNED)},
         char         => True,
         string       => True,
         text         => True,
+        int8         => 'tinyInteger',
+        uint8        => ['tinyInteger', UNSIGNED],
         int16        => 'smallInteger',
         uint16       => ['smallInteger', UNSIGNED],
         int          => 'integer',
@@ -80,7 +84,7 @@ class Yii2Format is TransformFormat is export {
                 q[if ($this->db->driverName === 'mysql') {] ~ "\n" ~
                 (
                     '// https://stackoverflow.com/q/766809' ~ "\n" ~
-                    q[$tableOptions = 'CHARACTER SET utf8 COLLATE utf8_unicode_ci ENGINE=InnoDB';]
+                    q[$tableOptions = 'CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci ENGINE=InnoDB';]
                 ).indent(4) ~ "\n" ~
                 "}\n" ~
                 "\n" ~

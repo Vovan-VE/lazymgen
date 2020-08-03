@@ -2,7 +2,7 @@
 + PK %table-name ( column-foo , column-bar )
 ---- OUT ----
 $> add_pk_table_name_column_foo_column_bar
-    > Generated with Lazy Migration Generator
+    > Generated with lazymgen - Lazy Migration Generator
     > Format: Yii2
     >
     > Source:

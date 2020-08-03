@@ -2,7 +2,7 @@
 * %table\@name\+is\|strange . \#\~column\$name\* : int > \$\%t\; => : uint > \ \ \.
 ---- OUT ----
 $> alter_table_name_is_strange_column_name
-    > Generated with Lazy Migration Generator
+    > Generated with lazymgen - Lazy Migration Generator
     > Format: Yii2
     >
     > Source:

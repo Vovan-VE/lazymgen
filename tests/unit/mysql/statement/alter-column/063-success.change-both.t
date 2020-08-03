@@ -2,7 +2,7 @@
 * %table-name . foo : integer(10)? = 42 ^ => bar : decimal(20,2) = 42.00 > lol
 ---- OUT ----
 $> alter_table-name_foo_bar
-    > Generated with Lazy Migration Generator
+    > Generated with lazymgen - Lazy Migration Generator
     > Format: MySQL
     >
     > Source:

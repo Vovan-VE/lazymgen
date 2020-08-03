@@ -2,7 +2,7 @@
 + PK %table-name ( column-foo , column-bar )
 ---- OUT ----
 $> add_pk-table-name-column-foo-column-bar
-    > Generated with Lazy Migration Generator
+    > Generated with lazymgen - Lazy Migration Generator
     > Format: MySQL
     >
     > Source:

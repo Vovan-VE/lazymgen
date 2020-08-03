@@ -2,7 +2,7 @@
 - %table\@name\+is\|strange ( \#\~column\$name\* : int )
 ---- OUT ----
 $> drop_table_name_is_strange
-    > Generated with Lazy Migration Generator
+    > Generated with lazymgen - Lazy Migration Generator
     > Format: Yii2
     >
     > Source:
@@ -16,7 +16,7 @@ $> drop_table_name_is_strange
             $tableOptions = null;
             if ($this->db->driverName === 'mysql') {
                 // https://stackoverflow.com/q/766809
-                $tableOptions = 'CHARACTER SET utf8 COLLATE utf8_unicode_ci ENGINE=InnoDB';
+                $tableOptions = 'CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci ENGINE=InnoDB';
             }
 
             $this->createTable('{{%table@name+is|strange}}', [

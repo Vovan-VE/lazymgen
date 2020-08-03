@@ -13,9 +13,11 @@ float
 int
 int16
 int64
+int8
 money
 primary
 primary-big
+primary64
 string
 text
 time
@@ -23,5 +25,7 @@ timestamp
 uint
 uint16
 uint64
+uint8
 uprimary
 uprimary-big
+uprimary64
